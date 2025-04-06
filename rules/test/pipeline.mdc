@@ -1,0 +1,31 @@
+---
+description: Guidelines on how to start test development pipeline
+globs: *_test.go
+alwaysApply: false
+---
+
+# Steps to follow:
+1. all the sub rules regard to test pipeline are inside folder `${PWD}/.cursor/rules/test`
+2. I will provide the business logic file, you shall create unit test for that file, if didn't provide the file, please ask me first
+3. Write test using rules `${PWD}/.cursor/rules/test/create-test.mdc`
+   - If you need to create test data, refer to the `prepare-test-data.mdc` rule for more details
+   - If you need to create unit test on database layer use `${PWD}/.cursor/rules/test/use-sqlmock.mdc` rule for more details
+4. Run test file using rules `${PWD}/.cursor/rules/test/run-test.mdc`
+5. Error Analysis & Refinement Loop:
+   - Re-run tests with focused scope: `go test -v -run ^TestSpecificFunction$ ./path/to/package`
+   - correct test file based on failures
+   - correct test data based on failures
+   - rerun test file until all test cases pass
+   - if you need more details, you can use verbose output (-v flag)
+6. Coverage Verification:
+   - after all test cases pass, you shall check the test coverage with command:
+   - go test -cover ./... -coverprofile=coverage.out
+   - go tool cover -html=coverage.out
+   - Keep test coverage at least 80%
+   - if not meet 80% you shall continue to detect the missing part and write test for that part
+
+# Remaining Considerations:
+   - Always maintain test data according to both rules
+   - Use consistent naming conventions across writing and running
+   - Regular race condition checking with -race flag
+

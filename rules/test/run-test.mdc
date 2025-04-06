@@ -1,6 +1,6 @@
 ---
 description: Guidelines for AI to learn how to runnning Go test files
-globs: api/system/**/*_test.go,api/internal/api/**/*_test.go,api/internal/app/**/*_test.go,api/internal/business/**/*_test.go,api/internal/constant/**/*_test.go,api/internal/pkg/**/*_test.go
+globs: *_test.go
 alwaysApply: false
 ---
 # Running Unit Tests Guidelines

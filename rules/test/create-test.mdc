@@ -1,6 +1,6 @@
 ---
 description: Base rules how to write Go test files with proper conventions and patterns
-globs: api/system/**/*_test.go,api/internal/api/**/*_test.go,api/internal/app/**/*_test.go,api/internal/business/**/*_test.go,api/internal/constant/**/*_test.go,api/internal/pkg/**/*_test.go
+globs: *_test.go
 alwaysApply: false
 ---
 # Test Creation Base Rules
@@ -47,11 +47,4 @@ alwaysApply: false
 9.  File structure understanding:
     - For understanding the project structure when creating test files, refer to the guidance in the `project-structure.mdc` rule.
 
-# Addtional rules
-
-1. If you need to create test data, please follow below guidelines
-    - refer to the `test-03-test-data.mdc` rule for more details
-
-2. If you need to create test on database, please follow below guidelines
-    - refer to the `test-04-go-sqlmock.mdc` rule for more details
 
