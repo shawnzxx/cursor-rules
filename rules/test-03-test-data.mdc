@@ -1,0 +1,104 @@
+---
+description: Guidelines for AI to create test data for unit tests
+globs: api/system/**/*_test.go,api/internal/api/**/*_test.go,api/internal/app/**/*_test.go,api/internal/business/**/*_test.go,api/internal/constant/**/*_test.go,api/internal/pkg/**/*_test.go
+alwaysApply: false
+---
+
+## If you need to create test data, please follow below guidelines
+
+1. **Test Data Directory Structure shall follow below**
+   ```
+   mypackage/
+   ├── mycode.go (business logic in here)
+   ├── mycode_test.go (new test file in here)
+   └── testdata/ (test required data in here)
+       ├── input/
+       │   ├── valid/
+       │   │   └── case1.csv
+       │   └── invalid/
+       │       └── malformed.csv
+       ├── fixtures/
+       │   └── db_seed.sql
+       └── expected/
+           └── case1_result.json
+   ```
+
+2. **Data File Naming Conventions**
+   - Use meaningful prefixes to identify data types: `input_`, `expected_`
+   - Include version information: `data_v1.csv`, `data_v2.csv`
+   - For multi-language data, use language codes: `data_zh.csv`, `data_en.csv`
+   - Use underscores to separate naming components: `valid_user_input.csv`
+
+3. **Data Access Methods**
+   ```go
+   // Recommended data access method
+   const testdataDir = "testdata"
+   
+   func loadTestData(t *testing.T, filename string) []byte {
+       t.Helper()
+       path := filepath.Join(testdataDir, filename)
+       data, err := os.ReadFile(path)
+       require.NoError(t, err, "Failed to read test data")
+       return data
+   }
+   ```
+
+4. **Data Format Standards**
+   - CSV files:
+     - Use UTF-8 encoding
+     - First row must contain column headers
+     - Use comma as separator
+   - JSON files:
+     - Use formatted JSON (for version control convenience)
+     - Include data version information
+   - SQL files:
+     - Include cleanup statements
+     - Wrap with transactions
+
+5. **Test Data Version Control**
+   - Include testdata directory in version control
+   - Use Git LFS for large binary files
+   - Document version history in README.md
+   - Maintain backward compatibility
+
+6. **Data Cleanup Strategy**
+   ```go
+   func TestMain(m *testing.M) {
+       // Cleanup before tests
+       cleanup := func() {
+           os.RemoveAll("testdata/temp")
+       }
+       cleanup()
+       defer cleanup()
+       
+       m.Run()
+   }
+   ```
+
+7. **Test Data Generator**
+   ```go
+   type TestDataGenerator struct {
+       OutputDir string
+   }
+   
+   func (g *TestDataGenerator) GenerateCSV(rows [][]string, filename string) error {
+       path := filepath.Join(g.OutputDir, filename)
+       file, err := os.Create(path)
+       if err != nil {
+           return fmt.Errorf("failed to create test data file: %w", err)
+       }
+       defer file.Close()
+       
+       writer := csv.NewWriter(file)
+       defer writer.Flush()
+       
+       return writer.WriteAll(rows)
+   }
+   ```
+
+8. **Best Practice Considerations**
+   - Avoid hardcoding test data in test code
+   - Keep test data files small and precise
+   - Use representative data samples
+   - Include boundary condition test data
+   - Regularly update and maintain test data

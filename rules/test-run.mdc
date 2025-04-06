@@ -1,0 +1,101 @@
+---
+description: Guidelines for AI to learn how to runnning Go test files
+globs: api/system/**/*_test.go,api/internal/api/**/*_test.go,api/internal/app/**/*_test.go,api/internal/business/**/*_test.go,api/internal/constant/**/*_test.go,api/internal/pkg/**/*_test.go
+alwaysApply: false
+---
+# Running Unit Tests Guidelines
+
+## Basic Test Commands
+
+### Run All Tests in Current Package
+```bash
+go test ./...
+```
+
+### Run Specific Test Function
+```bash
+go test -timeout 30s -run ^TestFunctionName$ code.in.spdigital.sg/sp-digital/tyche/{{package_location}}
+```
+
+### Run Tests with Coverage
+```bash
+go test -cover ./...
+```
+
+## Common Test Flags
+
+- `-v`: Verbose output, shows all test function results
+- `-timeout 30s`: Sets test timeout (default is 10 minutes)
+- `-run regexp`: Run only tests matching the regular expression
+- `-count=1`: Disable test caching
+- `-race`: Enable data race detection
+
+## IDE Test Running
+
+In most IDEs (like GoLand, VSCode), you can:
+1. Click the "play" button next to test function
+2. Right-click on test file and select "Run Tests"
+3. Use keyboard shortcuts defined by your IDE
+
+## Test Coverage
+
+To generate and view test coverage:
+```bash
+# Generate coverage profile
+go test -coverprofile=coverage.out ./...
+
+# View coverage in browser
+go tool cover -html=coverage.out
+```
+
+## Common Issues & Solutions
+
+1. **Test Cache**
+   - Go caches test results by default
+   - To force re-run: `go clean -testcache` or use `-count=1`
+
+2. **Timeout Issues**
+   - Default timeout is 10 minutes
+   - Adjust with `-timeout` flag (e.g., `-timeout 30s`)
+
+3. **Package Not Found**
+   - Ensure you're in the correct directory
+   - Check module path in go.mod
+   - Run `go mod tidy` if needed
+
+## Best Practices
+
+1. Run tests before committing changes
+2. Use `-race` flag periodically to check for race conditions
+3. Maintain test coverage above project standards
+4. Write focused, deterministic tests
+5. Clean up test artifacts after running tests
+
+## Examples
+
+### Run Single Test
+```bash
+# Run specific test function
+go test -timeout 30s -run ^Test_Debit$ code.in.spdigital.sg/sp-digital/tyche/api/internal/business/domain/expirybus
+
+# Run with verbose output
+go test -v -timeout 30s -run ^Test_Debit$ code.in.spdigital.sg/sp-digital/tyche/api/internal/business/domain/expirybus
+```
+
+### Run Package Tests
+```bash
+# Run all tests in current package
+go test .
+
+# Run all tests in package and sub-packages
+go test ./...
+```
+
+### Run with Coverage
+```bash
+# Run tests with coverage for specific package
+go test -cover code.in.spdigital.sg/sp-digital/tyche/api/internal/business/domain/expirybus
+
+# Run all tests with coverage and generate report
+go test -coverprofile=coverage.out ./... && go tool cover -html=coverage.out
+```

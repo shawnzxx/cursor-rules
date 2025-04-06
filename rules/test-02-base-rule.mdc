@@ -1,0 +1,57 @@
+---
+description: Base rules how to write Go test files with proper conventions and patterns
+globs: api/system/**/*_test.go,api/internal/api/**/*_test.go,api/internal/app/**/*_test.go,api/internal/business/**/*_test.go,api/internal/constant/**/*_test.go,api/internal/pkg/**/*_test.go
+alwaysApply: false
+---
+# Test Creation Base Rules
+
+1.  Use the following libraries for assertions:
+
+    - "github.com/stretchr/testify/assert"
+    - "github.com/stretchr/testify/require"
+
+2.  Implement table-driven tests:
+
+    - Use a variable named `tcs` to hold test cases -`tcs` should be a map[string]struct{}, where the key is the test case name and the struct contains test parameters
+    - each tcs struct key string use English, don't give me Chinese
+    - test case name use English
+
+3.  Group related test cases into Test Suites
+
+    - you shall use function setupSuite(t) and defer teardownSuite(t) for each test which allow them to share same setup
+
+4.  Use appropriate test strategy:
+
+    - Fake, Stub, or Mock objects can be used if you need to handle dependecy
+    - you can use Stub approach only for those function which was defined like aliase function
+    - you can use Mock approach to mimic the dependecy if they are defined like interface, all my interface have pre-generated Mocks library you can refer to the file named with mock\_\*.go in the same folder
+
+5.  Follow Go testing conventions:
+
+    - Name test functions as TestXxx where Xxx describes what's being tested
+    - Use t.Run() for subtests within a test function
+
+6.  Ensure proper error handling and reporting:
+
+    - Use t.Errorf() or t.Fatalf() to report test failures with descriptive messages
+    - Include expected vs. actual values in failure messages
+
+7.  Aim for high test coverage:
+
+    - Test both happy paths and edge cases
+    - Include both positive and negative test cases to ensure cover err handling logic
+
+8.  Use test helpers for common setup or assertion patterns:
+    - Create helper functions to reduce duplication in test code
+
+9.  File structure understanding:
+    - For understanding the project structure when creating test files, refer to the guidance in the `project-structure.mdc` rule.
+
+# Addtional rules
+
+1. If you need to create test data, please follow below guidelines
+    - refer to the `test-03-test-data.mdc` rule for more details
+
+2. If you need to create test on database, please follow below guidelines
+    - refer to the `test-04-go-sqlmock.mdc` rule for more details
+

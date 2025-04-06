@@ -1,0 +1,42 @@
+---
+description: Project general specifications and basic information
+alwaysApply: true
+---
+# General rules and basic infomation
+
+## .cursor/rules/project-structure.mdc
+
+Description: Base project structure and coding standards.
+
+---
+
+## .cursor/rules/domain-creation.mdc
+
+@base_rules.mdc
+
+Description: When creating a new domain or extending functionality in an existing domain.
+
+---
+
+## .cursor/rules/test-02-creation.mdc
+
+@base_rules.mdc
+
+Description: write unit test standards.
+
+---
+
+## .cursor/rules/test-03-running.mdc
+
+@base_rules.mdc
+
+Description: run test and run code coverage standards.
+
+---
+
+## .cursor/rules/test-01-workflow.mdc
+
+@base_rules.mdc  
+@test-02-creation.mdc  
+@test-03-running.mdc  
+Description: Test development workflow standards.

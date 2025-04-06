@@ -1,0 +1,33 @@
+---
+description: Guidelines on how to start test development workflow
+globs: api/system/**/*_test.go,api/internal/api/**/*_test.go,api/internal/app/**/*_test.go,api/internal/business/**/*_test.go,api/internal/constant/**/*_test.go,api/internal/pkg/**/*_test.go
+alwaysApply: false
+---
+
+# How you can start the task of creating a new unit test file
+   - Immediate feedback loop between writing and execution
+   - Consistent test data management across both aspects
+   - Unified approach to test organization and naming
+   - Clear error diagnosis and refinement path
+
+# Steps to follow:
+   1. Write test using rules `test-02-base-rule.mdc`
+      - If you need to create test data, refer to the `test-03-test-data.mdc` rule for more details
+      - If you need to create test on database refer to the `test-04-go-sqlmock.mdc` rule for more details
+   2. Run test file using rules `test-run.mdc`
+   3. Error Analysis & Refinement Loop:
+      - If errors occur, you can use verbose output (-v flag)
+      - Refine test cases based on failures
+      - Re-run tests with focused scope:
+      go test -v -run ^TestSpecificFunction$ ./path/to/package
+
+   4. Coverage Verification:
+      - go test -cover ./... -coverprofile=coverage.out
+      - go tool cover -html=coverage.out
+
+# Remaining Considerations:
+   - Always maintain test data according to both rules
+   - Use consistent naming conventions across writing and running
+   - Keep test coverage high while following both guidelines
+   - Regular race condition checking with -race flag
+

@@ -1,0 +1,244 @@
+---
+description: Guidelines for AI to learn how to write unit tests for database operations using go-sqlmock
+globs: api/internal/business/domain/**/*_test.go
+alwaysApply: false
+---
+
+# Go SQLMock Best Practices
+
+## Overview
+
+This document outlines best practices for using `go-sqlmock` in unit tests, based on practical experience and common patterns.
+
+## Key Principles
+
+1. **Mock Setup and Cleanup**
+   ```go
+   func TestDatabase(t *testing.T) {
+       t.Parallel()
+       
+       db, mock, err := sqlmock.New()
+       require.NoError(t, err)
+       
+       // ✅ Correct: Close expectation right before actual close
+       defer func() {
+           mock.ExpectClose()
+           err = db.Close()
+           require.NoError(t, err)
+           require.NoError(t, mock.ExpectationsWereMet())
+       }()
+       
+       // ❌ Incorrect: Don't set Close expectation too early
+       // mock.ExpectClose()  // Don't do this!
+   }
+   ```
+
+2. **Expectations Management**
+   - Set expectations in the exact order they will be executed
+   - Keep expectations close to their corresponding operations
+   - Use specific argument matchers when possible
+   ```go
+   // ✅ Correct: Query expectation right before the operation
+   mock.ExpectQuery(`SELECT (.+) FROM users`).
+       WithArgs(1).
+       WillReturnRows(rows)
+   result := store.GetUser(1)  // Operation immediately follows expectation
+   
+   // ❌ Incorrect: Don't set all expectations at the start
+   // mock.ExpectQuery(...)
+   // mock.ExpectExec(...)
+   // mock.ExpectClose()
+   // ... lots of code ...
+   // actual operations
+   ```
+
+3. **Transaction Handling**
+   ```go
+   // ✅ Correct: Transaction expectations in order
+   mock.ExpectBegin()
+   tx, err := db.Begin()
+   require.NoError(t, err)
+   
+   mock.ExpectExec(`UPDATE users`).
+       WillReturnResult(sqlmock.NewResult(1, 1))
+   err = store.UpdateUser(tx, user)
+   require.NoError(t, err)
+   
+   mock.ExpectCommit()
+   err = tx.Commit()
+   require.NoError(t, err)
+   ```
+
+4. **Result Mocking**
+   ```go
+   // Create mock rows with appropriate columns
+   rows := sqlmock.NewRows([]string{"id", "name"}).
+       AddRow(1, "test")
+   
+   // Set expectation right before the query
+   mock.ExpectQuery(`SELECT \* FROM users WHERE id = \$1`).
+       WithArgs(1).
+       WillReturnRows(rows)
+   ```
+
+5. **Error Handling**
+   ```go
+   // Test error scenarios
+   mock.ExpectQuery(`SELECT \* FROM users`).
+       WillReturnError(sql.ErrNoRows)
+   
+   // Test specific database errors
+   mock.ExpectExec(`INSERT INTO users`).
+       WillReturnError(&pq.Error{
+           Code:    "23505",
+           Message: "unique_violation",
+       })
+   ```
+
+## Common Test Patterns
+
+1. **Basic Query Test**
+   ```go
+   func TestUserQuery(t *testing.T) {
+       t.Parallel()
+       
+       db, mock, err := sqlmock.New()
+       require.NoError(t, err)
+       
+       defer func() {
+           mock.ExpectClose()
+           err = db.Close()
+           require.NoError(t, err)
+           require.NoError(t, mock.ExpectationsWereMet())
+       }()
+       
+       store := NewStore(db)
+       
+       // Set up expectations right before operations
+       mock.ExpectQuery(`SELECT \* FROM users WHERE id = \$1`).
+           WithArgs(1).
+           WillReturnRows(sqlmock.NewRows([]string{"id", "name"}).
+               AddRow(1, "test"))
+       
+       user, err := store.GetUser(1)
+       require.NoError(t, err)
+       require.Equal(t, "test", user.Name)
+   }
+   ```
+
+2. **Transaction Test**
+   ```go
+   func TestUserTransaction(t *testing.T) {
+       t.Parallel()
+       
+       db, mock, err := sqlmock.New()
+       require.NoError(t, err)
+       
+       defer func() {
+           mock.ExpectClose()
+           err = db.Close()
+           require.NoError(t, err)
+           require.NoError(t, mock.ExpectationsWereMet())
+       }()
+       
+       store := NewStore(db)
+       
+       // Transaction expectations in sequence
+       mock.ExpectBegin()
+       mock.ExpectExec(`INSERT INTO users`).
+           WithArgs("test", 25).
+           WillReturnResult(sqlmock.NewResult(1, 1))
+       mock.ExpectCommit()
+       
+       err = store.CreateUserTx(context.Background(), User{Name: "test", Age: 25})
+       require.NoError(t, err)
+   }
+   ```
+
+## Best Practices Checklist
+
+1. **Setup Phase**
+   - [ ] Initialize mock database with `sqlmock.New()`
+   - [ ] Set up defer function for cleanup
+   - [ ] Move Close expectation into defer function
+
+2. **Expectations**
+   - [ ] Set expectations immediately before their operations
+   - [ ] Use precise SQL query patterns
+   - [ ] Include all expected arguments
+   - [ ] Match data types exactly
+
+3. **Cleanup**
+   - [ ] Set Close expectation in defer
+   - [ ] Close database connection
+   - [ ] Check all expectations were met
+
+4. **Common Pitfalls to Avoid**
+   - [ ] Don't set Close expectation too early
+   - [ ] Don't set all expectations at the start
+   - [ ] Don't forget to check ExpectationsWereMet()
+   - [ ] Don't mix expectation and operation order
+
+## Error Handling Examples
+
+```go
+func TestErrorHandling(t *testing.T) {
+    t.Parallel()
+    
+    db, mock, err := sqlmock.New()
+    require.NoError(t, err)
+    
+    defer func() {
+        mock.ExpectClose()
+        err = db.Close()
+        require.NoError(t, err)
+        require.NoError(t, mock.ExpectationsWereMet())
+    }()
+    
+    // Test connection error
+    mock.ExpectQuery(`SELECT`).
+        WillReturnError(sql.ErrConnDone)
+    
+    // Test constraint violation
+    mock.ExpectExec(`INSERT`).
+        WillReturnError(&pq.Error{
+            Code: "23505",
+        })
+}
+```
+
+## Concurrent Testing
+
+When writing concurrent tests:
+1. Each goroutine should have its own mock expectations
+2. Ensure expectations are set in the correct order within each goroutine
+3. Use sync.WaitGroup to wait for all operations to complete
+4. Check ExpectationsWereMet() after all goroutines finish
+
+```go
+func TestConcurrent(t *testing.T) {
+    t.Parallel()
+    
+    db, mock, err := sqlmock.New()
+    require.NoError(t, err)
+    
+    defer func() {
+        mock.ExpectClose()
+        err = db.Close()
+        require.NoError(t, err)
+        require.NoError(t, mock.ExpectationsWereMet())
+    }()
+    
+    var wg sync.WaitGroup
+    for i := 0; i < 3; i++ {
+        wg.Add(1)
+        go func(id int) {
+            defer wg.Done()
+            mock.ExpectQuery(`SELECT`).
+                WithArgs(id).
+                WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(id))
+        }(i)
+    }
+    wg.Wait()
+}
+```
