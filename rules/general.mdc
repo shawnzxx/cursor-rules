@@ -4,14 +4,21 @@ globs:
 alwaysApply: true
 ---
 
-Always start your output with "Hey DDD buddy here!"
+### General Rules:
+- Act as a AI coding agent, your goal is to solve coding tasks 👽
+- Always start your output with "Hey DDD buddy here 😘"
+- Before coding, write a short plan 🙋‍♂️
+- Once approved, start to write code 💻
 
-This is my file strcuture, always use it as a guide so that you edit the right files 
-The whole project follow [Clean Architecture](mdc:https:/blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html) concept, with different package naming.
+### Project coding standard:
+- The whole project follow [Clean Architecture](mdc:https:/blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html) concept, with different package naming
 - api layer = Clean Architecture Controllers
 - app layer = Clean Architecture Use Cases
 - business layer = Clean Architecture Entities
 - repository = Clean Architecture Data Access
+
+### Folder structure:
+- This is my file strcuture, always use it as a guide so that you edit the right files
 
 ```
 ├── .githooks/                  # Git hooks for pre-commit and pre-push checks
@@ -87,7 +94,7 @@ The whole project follow [Clean Architecture](mdc:https:/blog.cleancoder.com/unc
 ├── README.md                   # Project documentation
 └── CODEOWNERS                  # Merge rights & auto reviewer assignment
 ```
-
+### Additional guidance:
 1. **New File Creation**:
    - When you need to create a new file, place it in the appropriate directory
    - api logic shall goes in `${PWD}/api/internal/api/domain/`
@@ -98,20 +105,23 @@ The whole project follow [Clean Architecture](mdc:https:/blog.cleancoder.com/unc
 2. **Root packages's dependency**:
    - executable binary root packages's dependency init function goes in `${PWD}/api/cmd/internal/components/`
 
-4. **ORM layer**:
+3. **ORM layer**:
    - ORM code logic refer to `${PWD}/api/internal/repository/orm/`
 
-5. **Testing**:
+4. **Testing**:
    - Test cases logic refer to `${PWD}/api/cmd/job/testcase/{job_name}/`
 
-6. **Clean Architecture**:
- 
-
-7. **When Uncertain**:
+5. **When Uncertain**:
    - If uncertain about where to place a new file or directory, ask me in chat window:
      - What layer it belongs to
 
-8. **Constants and Configs**:
+6. **Constants and Configs**:
    - Application-wide constants go in `${PWD}/api/internal/constant/`
    - Local development environment configurations find in `${PWD}/api/local.env`
+
+### Subfolder rules:
+- if you need to works on [README.md](mdc:README.md), please refer to `./cursor/rules/common/README.mdc`
+- if you need to works on `*_test.go`, please refer to `./cursor/rules/test/*.mdc`
+- if you need to works on `*.go` file, please refer to `./cursor/rules/business/*.mdc`
+
 

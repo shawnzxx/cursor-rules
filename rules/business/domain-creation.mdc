@@ -1,55 +1,37 @@
 ---
 description: Guidelines for writing new domain logic across api, app, business layers
-globs: ["*.go"]
+globs: *.go
 alwaysApply: false
 ---
 # Domain Creation Guidelines
 
 ## Implementation Steps
 
-1. **Domain Naming**:
-   - Use clear, descriptive names that reflect the domain's purpose
-   - Avoid generic names like "utils" or "common" for domains
-   - Use lowercase names with underscores for multi-word domains (e.g., `user_management`)
+### File naming convition
+- Use clear, descriptive names that reflect the domain's purpose
+- Avoid generic names like "utils" or "common" for domains
+- Use lowercase names with underscores for multi-word domains (e.g., `user_management`)
 
-2. **File Organization**:
-   - Create the domain structure in each layer:
-     - `api/internal/api/domain/[your_domain]/`
-     - `api/internal/app/domain/[your_domain]/`
-     - `api/internal/business/domain/[your_domain]/`
-     - `api/internal/constant/[related_constants]/` (if needed)
-   - Domain-specific repository code should be organized in the repository layer
-
-3. **API Implementation**:
+### File organization
+Create the domain structure in each layer:
    - REST handlers should go in `api/internal/api/domain/[your_domain]/rest/`
    - Kafka handlers should go in `api/internal/api/domain/[your_domain]/kafka/`
-   - API DTOs (Data Transfer Objects) should be defined in these layers
+   - app domain business logic goes into `api/internal/app/domain/[your_domain]/*.go`
+   - domain logics goes into `api/internal/business/domain/[your_domain]/*.go`
+   - if require new constant value goes into `api/internal/constant/[related_constants]/*.go`
+   - orm logic goes into `api/internal/repository/orm/*.go`
 
-4. **Application Logic**:
-   - Implement use cases in `api/internal/app/domain/[your_domain]/`
-   - Service interfaces should be defined here
-   - Orchestration logic between different domains should be implemented here
+### App folder logic
+- Implement use cases in `api/internal/app/domain/[your_domain]/*.go`
+- Service interfaces should be defined here
+- Orchestration logic between different domains should be implemented here
 
-5. **Business Logic**:
-   - Domain entities should be defined in `api/internal/business/domain/[your_domain]/`
-   - Core business rules and validations should be implemented here
-   - Entities should be independent of persistence mechanisms
+### Business folder logic
+- Domain entities should be defined in `api/internal/business/domain/[your_domain]/*.go`
+- Core business rules and validations should be implemented here
+- Define appropriate repository interfaces inside the file
 
-6. **Repository Integration**:
-   - If the domain requires persistent storage, define appropriate repository interfaces
-   - Repository implementations should interact with `api/internal/repository/orm/`
-
-7. **Testing**:
-   - Create appropriate test files for each layer
-   - Follow the Go testing guidelines in `go-tests.mdc`
-   - Ensure proper test coverage for each layer
-
-8. **Documentation**:
-   - Document the domain's purpose and responsibilities
-   - Include example usage where appropriate
-   - Update relevant README files if necessary
-
-9. **Integration**:
-   - Ensure proper dependency injection
-   - Register new services and handlers in the appropriate initialization code
-   - Update dependency configuration where necessary
+### Storer layer
+- this package mainly to implement the business folder interface which can be found in folder `api/internal/business/domain/[your_domain]/*.go`
+- package name follow `[your_domain]db`
+- file name follow `[your_domain]db.go`
