@@ -1,6 +1,6 @@
 ---
-description: Base rules how to write Go test files with proper conventions and patterns
-globs: *_test.go
+description: 
+globs: 
 alwaysApply: false
 ---
 # Test Creation Base Rules

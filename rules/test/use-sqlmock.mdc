@@ -1,6 +1,6 @@
 ---
-description: Guidelines for AI to learn how to write unit tests for database operations using go-sqlmock
-globs: *_test.go
+description: 
+globs: 
 alwaysApply: false
 ---
 

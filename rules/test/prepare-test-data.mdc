@@ -1,6 +1,6 @@
 ---
-description: Guidelines for AI to create test data for unit tests
-globs: *_test.go
+description: 
+globs: 
 alwaysApply: false
 ---
 

@@ -1,6 +1,6 @@
 ---
-description: Guidelines for AI to learn how to runnning Go test files
-globs: *_test.go
+description: 
+globs: 
 alwaysApply: false
 ---
 # Running Unit Tests Guidelines

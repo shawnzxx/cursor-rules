@@ -1,6 +1,6 @@
 ---
-description: Guidelines for writing new domain logic across api, app, business layers
-globs: *.go
+description: 
+globs: 
 alwaysApply: false
 ---
 # Domain Creation Guidelines
