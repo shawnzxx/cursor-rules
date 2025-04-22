@@ -1,0 +1,26 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Business Layer (Entities) Guidelines
+
+This rule applies to files within the Business Layer (`[api/internal/business/](mdc:api/internal/business)`), which corresponds to **Entities** in Clean Architecture.
+
+## Core Principles
+
+-   **Independence**: Business logic should be independent of frameworks, UI, databases, and external concerns.
+-   **Domain Focus**: Contains the core business rules, data structures (entities), and domain-specific logic.
+
+## File Placement
+
+-   **Domain-Specific Logic**: Place core business logic and entity definitions within specific subdirectories under:
+    `[api/internal/business/domain/](mdc:api/internal/business/domain)`
+    -   **Interfaces**: Define business logic interfaces within the domain's primary business logic file, typically named like:
+        `[api/internal/business/domain/{domain}bus/{domain}bus.go](mdc:api/internal/business/domain)
+    -   **Implementations**: Place implementations of these interfaces in subdirectories within the same domain folder, categorized by their dependency (e.g., database, external service). For example, a database implementation might reside in:
+        `[api/internal/business/domain/{domain}bus/{domain}db/{domain}db.go](mdc:api/internal/business/domain)
+-   **Shared SDKs**: If there are reusable components *within* the business layer across different domains, place them in:
+    `[api/internal/business/sdk/](mdc:api/internal/business/sdk)`
+
+When working on `*.go` files within this layer, ensure they adhere to these principles and structure.

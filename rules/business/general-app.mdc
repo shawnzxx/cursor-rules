@@ -1,0 +1,25 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# App Layer (Use Cases) Guidelines
+
+This rule applies to files within the App Layer (`[api/internal/app/](mdc:api/internal/app)`), which corresponds to **Use Cases** in Clean Architecture.
+
+## Core Principles
+
+-   **Orchestration**: The App Layer orchestrates the flow of data between the API/Controllers and the Business/Entities layers.
+-   **Application-Specific Logic**: Contains application-specific business rules and logic that are not part of the core domain (Business Layer).
+-   **Use Case Driven**: Organizes logic around specific application use cases or features.
+
+## File Placement
+
+-   **Domain-Specific Use Cases**: Place orchestration logic and use case implementations within specific subdirectories under:
+    `[api/internal/app/domain/](mdc:api/internal/app/domain)`
+-   **Application Errors**: Define custom error types specific to the App Layer in:
+    `[api/internal/app/errs/](mdc:api/internal/app/errs)`
+-   **Shared SDKs**: If there are reusable components *within* the App Layer across different use cases, place them in:
+    `[api/internal/app/sdk/](mdc:api/internal/app/sdk)`
+
+Remember that the App Layer depends on the Business Layer but should not be depended upon by it.

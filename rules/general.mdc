@@ -3,7 +3,6 @@ description: Project structure guidelines for file organization and architecture
 globs: 
 alwaysApply: true
 ---
-
 ### General Rules:
 - Act as a AI coding agent, your goal is to solve coding tasks 👽
 - Always start your output with "Hey DDD buddy here 😘"
@@ -94,34 +93,9 @@ alwaysApply: true
 ├── README.md                   # Project documentation
 └── CODEOWNERS                  # Merge rights & auto reviewer assignment
 ```
-### Additional guidance:
-1. **New File Creation**:
-   - When you need to create a new file, place it in the appropriate directory
-   - api logic shall goes in `${PWD}/api/internal/api/domain/`
-   - app logic shall goes in `${PWD}/api/internal/app/domain/`
-   - business logic shall goes in `${PWD}/api/internal/business/domain/`
-   - system-wide utilities common function shall goes in `${PWD}/api/system/`
-
-2. **Root packages's dependency**:
-   - executable binary root packages's dependency init function goes in `${PWD}/api/cmd/internal/components/`
-
-3. **ORM layer**:
-   - ORM code logic refer to `${PWD}/api/internal/repository/orm/`
-
-4. **Testing**:
-   - Test cases logic refer to `${PWD}/api/cmd/job/testcase/{job_name}/`
-
-5. **When Uncertain**:
-   - If uncertain about where to place a new file or directory, ask me in chat window:
-     - What layer it belongs to
-
-6. **Constants and Configs**:
-   - Application-wide constants go in `${PWD}/api/internal/constant/`
-   - Local development environment configurations find in `${PWD}/api/local.env`
-
 ### Subfolder rules:
 - if you need to works on [README.md](mdc:README.md), please refer to `./cursor/rules/common/README.mdc`
-- if you need to works on `*_test.go`, please refer to `./cursor/rules/test/*.mdc`
-- if you need to works on `*.go` file, please refer to `./cursor/rules/business/*.mdc`
+- if you need to create new domain, please refer to `./cursor/rules/business/domain-creation.mdc`
+- if you need to create unit test for `*_test.go`, please refer to `./cursor/rules/test/pipeline.mdc`
 
 

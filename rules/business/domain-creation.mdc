@@ -14,24 +14,24 @@ alwaysApply: false
 
 ### File organization
 Create the domain structure in each layer:
-   - REST handlers should go in `api/internal/api/domain/[your_domain]/rest/`
-   - Kafka handlers should go in `api/internal/api/domain/[your_domain]/kafka/`
-   - app domain business logic goes into `api/internal/app/domain/[your_domain]/*.go`
-   - domain logics goes into `api/internal/business/domain/[your_domain]/*.go`
-   - if require new constant value goes into `api/internal/constant/[related_constants]/*.go`
+   - REST handlers should go in `api/internal/api/domain/rest/`
+   - Kafka handlers should go in `api/internal/api/domain/kafka/`
+   - app domain business logic goes into `api/internal/app/domain/{domain}app/*.go` (See [App Layer Guidelines](mdc:.cursor/rules/business/general-app.mdc) for details).
+   - domain logics goes into `api/internal/business/domain/{domain}bus/*.go` (See [Business Layer Guidelines](mdc:.cursor/rules/business/general-business.mdc) for details).
+   - if require new constant value goes into `api/internal/constant/*`
    - orm logic goes into `api/internal/repository/orm/*.go`
 
 ### App folder logic
-- Implement use cases in `api/internal/app/domain/[your_domain]/*.go`
+- Implement use cases in `api/internal/app/domain/{domain}app/*.go` (See [App Layer Guidelines](mdc:.cursor/rules/business/general-app.mdc) for details).
 - Service interfaces should be defined here
 - Orchestration logic between different domains should be implemented here
 
 ### Business folder logic
-- Domain entities should be defined in `api/internal/business/domain/[your_domain]/*.go`
+- Domain entities should be defined in `api/internal/business/domain/{domain}bus/*.go` (See [Business Layer Guidelines](mdc:.cursor/rules/business/general-business.mdc) for details).
 - Core business rules and validations should be implemented here
 - Define appropriate repository interfaces inside the file
 
 ### Storer layer
-- this package mainly to implement the business folder interface which can be found in folder `api/internal/business/domain/[your_domain]/*.go`
-- package name follow `[your_domain]db`
-- file name follow `[your_domain]db.go`
+- this package mainly to implement the business folder interface which can be found in folder `api/internal/business/domain/{domain}bus/{domain}db/*.go` (See [Business Layer Guidelines](mdc:.cursor/rules/business/general-business.mdc) for details).
+- package name follow `{domain}db`
+- file name follow `{domain}db.go`

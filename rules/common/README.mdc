@@ -45,6 +45,14 @@ alwaysApply: false
 - 说明代码的预期输出或行为
 - 更新示例以匹配最新API
 
+# Root README.md Guidelines
+
+This rule applies when editing the root `[README.md](mdc:README.md)` file.
+
+-   Keep the README concise and focused on project setup, build/run instructions, and high-level architecture.
+-   Link to more detailed documentation or specific READMEs within subdirectories (like `[api/README.md](mdc:api/README.md)`) if necessary.
+-   Ensure consistency with the overall project structure and terminology.
+
 
 
 
