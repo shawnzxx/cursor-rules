@@ -42,9 +42,7 @@ alwaysApply: false
     - Include both positive and negative test cases to ensure cover err handling logic
 
 8.  Use test helpers for common setup or assertion patterns:
-    - Create helper functions to reduce duplication in test code
+    - Create helper functions to reduce duplication in test Code
 
-9.  File structure understanding:
-    - For understanding the project structure when creating test files, refer to the guidance in the `project-structure.mdc` rule.
 
 

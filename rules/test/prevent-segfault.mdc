@@ -1,0 +1,320 @@
+# Go Test Prevent Segfaults Guide
+
+## Overview
+
+This rule provides a systematic approach to debug and prevent segmentation faults in Go tests, based on common patterns and best practices.
+
+## Segfaults error sample
+
+error logs sample:
+
+```
+signal: segmentation fault
+=== RUN `make test` command from project root folder
+...
+signal: segmentation fault
+FAIL    code.in.spdigital.sg/sp-digital/tyche/api/internal/app/domain/adminapp  0.005s
+FAIL
+make: *** [api-test] Error 1
+make test failed. Aborting push.
+error: failed to push some refs to 'https://code.in.spdigital.sg/sp-digital/tyche.git'
+```
+
+## Common Causes of Mocking and Verify Errors
+
+### 1. Nil Pointer Dereference
+
+- **Risk**: Calling methods on nil interfaces/structs
+- **Common in**: Mock objects not properly initialized
+- **Check**: Ensure all mocks are created with `NewMockXxx(suite.T())`
+
+### 2. Global Variable Pollution
+
+- **Risk**: Tests affecting each other through shared state
+- **Common in**: Package-level variables, global mocks
+- **Check**: Use `SetupTest`/`TearDownTest` for proper isolation
+
+### 3. Patch Function Not Restored
+
+- **Risk**: Global function patches not properly restored
+- **Common in**: `tx.DoInTx`, time functions, external dependencies
+- **Check**: Always use defer to restore original functions
+
+### 4. Race Conditions
+
+- **Risk**: Concurrent access to shared data without proper synchronization
+- **Common in**: Tests with goroutines, shared mock state
+- **Check**: Use `-race` flag and proper mutex/locks
+
+## Systematic Debugging Steps
+
+### Step 1: Identify the Failing Package
+
+```bash
+# Run tests with verbose output to identify failing package
+go test -v ./internal/app/domain/adminapp
+```
+
+### Step 2: Check for Race Conditions
+
+```bash
+# Run multiple times with race detector
+for i in {1..5}; do
+  echo "=== Run $i ==="
+  go test -v ./internal/app/domain/adminapp -race
+done
+```
+
+### Step 3: Analyze Test Structure
+
+Check each test file for:
+
+- [ ] Mock initialization in `SetupTest`
+- [ ] Proper cleanup in `TearDownTest`
+- [ ] Global function patches with defer restoration
+- [ ] Package-level variables that might be shared
+
+### Step 4: Check Mock Patterns
+
+```go
+// ✅ Good: Fresh mock for each test
+func (s *TestSuite) SetupTest() {
+    s.mockStorer = NewMockStorer(s.T())
+    s.mockPublisher = NewMockPublisher(s.T())
+}
+
+// ❌ Bad: Reusing mocks across tests
+var globalMock = NewMockStorer(nil)
+```
+
+### Step 5: Verify Patch Restoration
+
+```go
+// ✅ Good: Proper patch with defer
+func (s *TestSuite) TestSomething() {
+    originalDoInTx := tx.DoInTx
+    tx.DoInTx = s.mockDoInTx
+    defer func() { tx.DoInTx = originalDoInTx }()
+
+    // test logic here
+}
+
+// ❌ Bad: Patch without restoration
+func (s *TestSuite) TestSomething() {
+    tx.DoInTx = s.mockDoInTx  // Never restored!
+    // test logic here
+}
+```
+
+## Test File Analysis Checklist
+
+### For Each Test File:
+
+1. **Mock Initialization**
+
+   - [ ] All mocks created with `NewMockXxx(suite.T())`
+   - [ ] No global mock variables
+   - [ ] Mocks initialized in `SetupTest` (not `SetupSuite`)
+
+2. **Setup/Teardown Methods**
+
+   - [ ] `SetupTest` exists and initializes all mocks
+   - [ ] `TearDownTest` restores all patches and global state
+   - [ ] No shared state between tests
+
+3. **Global Function Patches**
+
+   - [ ] All patches use `defer` for restoration
+   - [ ] Original functions stored before patching
+   - [ ] Patches restored even if test panics
+
+4. **Concurrency Safety**
+
+   - [ ] No shared mock state between goroutines
+   - [ ] Proper mutex usage for shared data
+   - [ ] Tests run with `-race` flag
+
+5. **Test Isolation**
+   - [ ] No package-level variables modified by tests
+   - [ ] Each test has independent mock expectations
+   - [ ] No test dependencies on execution order
+
+## Common Patterns to Avoid
+
+### ❌ Dangerous Patterns
+
+```go
+// Global mock - can cause race conditions
+var globalMock = NewMockStorer(nil)
+
+// Patch without restoration
+func TestSomething() {
+    tx.DoInTx = mockDoInTx
+    // Missing defer restoration
+}
+
+// Shared state between tests
+var sharedData = make(map[string]interface{})
+
+// Mock reuse across tests
+func (s *TestSuite) SetupSuite() {
+    s.mock = NewMockStorer(s.T())  // Shared across all tests
+}
+```
+
+### ✅ Safe Patterns
+
+```go
+// Fresh mock per test
+func (s *TestSuite) SetupTest() {
+    s.mock = NewMockStorer(s.T())
+}
+
+// Proper patch with restoration
+func (s *TestSuite) TestSomething() {
+    original := tx.DoInTx
+    tx.DoInTx = s.mockDoInTx
+    defer func() { tx.DoInTx = original }()
+}
+
+// Independent test data
+func (s *TestSuite) TestSomething() {
+    data := make(map[string]interface{})  // Local to test
+}
+```
+
+## Debugging Commands
+
+### Basic Test Execution
+
+```bash
+# Run specific package tests
+go test -v ./internal/app/domain/adminapp
+
+# Run with race detector
+go test -race ./internal/app/domain/adminapp
+
+# Run with timeout
+go test -timeout 30s ./internal/app/domain/adminapp
+```
+
+### Advanced Debugging
+
+```bash
+# Run multiple times to catch intermittent failures
+for i in {1..10}; do
+    go test -v ./internal/app/domain/adminapp
+done
+
+# Run with memory profiling
+go test -memprofile=mem.prof ./internal/app/domain/adminapp
+
+# Run with CPU profiling
+go test -cpuprofile=cpu.prof ./internal/app/domain/adminapp
+```
+
+### Stress Testing
+
+```bash
+# Run tests under stress to catch race conditions
+go test -race -count=100 ./internal/app/domain/adminapp
+
+# Run with different GOMAXPROCS
+GOMAXPROCS=1 go test -race ./internal/app/domain/adminapp
+GOMAXPROCS=8 go test -race ./internal/app/domain/adminapp
+```
+
+## Prevention Best Practices
+
+### 1. Always Use SetupTest for Mock Initialization
+
+```go
+func (s *TestSuite) SetupTest() {
+    s.mockStorer = NewMockStorer(s.T())
+    s.mockPublisher = NewMockPublisher(s.T())
+    s.mockCacher = NewMockCacher(s.T())
+}
+```
+
+### 2. Always Restore Patches
+
+```go
+func (s *TestSuite) TestWithPatch() {
+    original := someFunction
+    someFunction = s.mockFunction
+    defer func() { someFunction = original }()
+
+    // test logic
+}
+```
+
+### 3. Use Test-Specific Data
+
+```go
+func (s *TestSuite) TestSomething() {
+    // Create test-specific data
+    testData := &TestData{
+        ID:   "test-id",
+        Name: "test-name",
+    }
+
+    // Use in test
+    result := s.app.Process(testData)
+    s.Assert().NotNil(result)
+}
+```
+
+### 4. Check for Nil Before Use
+
+```go
+func (s *TestSuite) TestWithMock() {
+    s.mockStorer.On("Get", mock.Anything).Return(nil, nil)
+
+    // Always check for nil
+    if s.mockStorer != nil {
+        result := s.app.GetData("test")
+        s.Assert().NotNil(result)
+    }
+}
+```
+
+## When to Suspect Segmentation Faults
+
+### Red Flags:
+
+1. **Intermittent test failures** - especially with `signal: segmentation fault`
+2. **Tests that pass individually but fail in batch**
+3. **Race detector warnings** - even if tests pass
+4. **Large test files** (>1000 lines) with complex mock setups
+5. **Global variables or functions** being modified by tests
+6. **Mock objects** not properly initialized or restored
+
+### Immediate Actions:
+
+1. Run tests with `-race` flag multiple times
+2. Check all mock initializations in `SetupTest`
+3. Verify all patches are properly restored
+4. Look for shared state between tests
+5. Consider breaking large test files into smaller ones
+
+## Summary
+
+Segmentation faults in Go tests are usually caused by:
+
+- **Nil pointer dereference** (most common)
+- **Race conditions** in concurrent tests
+- **Global state pollution** between tests
+- **Unrestored function patches**
+
+The key to prevention is:
+
+- **Always initialize mocks in SetupTest**
+- **Always restore patches with defer**
+- **Use -race flag regularly**
+- **Keep tests isolated and independent**
+- **Avoid global variables in tests**
+  description:
+  globs:
+  alwaysApply: false
+
+---

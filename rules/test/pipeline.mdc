@@ -4,7 +4,8 @@ globs: *_test.go
 alwaysApply: false
 ---
 
-# Steps to follow:
+## Steps to follow:
+
 1. all the sub rules regard to test pipeline are inside folder `${PWD}/.cursor/rules/test`
 2. I will provide the business logic file, you shall create unit test for that file, if didn't provide the file, please ask me first
 3. Write test using rules `${PWD}/.cursor/rules/test/create-test.mdc`
@@ -22,10 +23,18 @@ alwaysApply: false
    - go test -cover ./... -coverprofile=coverage.out
    - go tool cover -html=coverage.out
    - Keep test coverage at least 80%
+   - **Exclude mock\_\*.go files from coverage calculation** - these are auto-generated mock files and should not be included in coverage requirements
+   - **Focus on business logic coverage** - ensure actual business logic files (\_.go excluding mock\_\_.go) have at least 80% coverage
    - if not meet 80% you shall continue to detect the missing part and write test for that part
+   - **Coverage Analysis Commands**:
+     - For overall coverage: `go test -cover ./... -coverprofile=coverage.out`
+     - For business logic only: `go test -cover ./... -coverprofile=coverage.out && go tool cover -func=coverage.out | grep -v mock_`
+     - Check business logic files specifically: `go tool cover -func=coverage.out | grep "\.go:" | grep -v mock_`
 
-# Remaining Considerations:
-   - Always maintain test data according to both rules
-   - Use consistent naming conventions across writing and running
-   - Regular race condition checking with -race flag
+## Remaining Considerations:
 
+- Always maintain test data according to both rules
+- Use consistent naming conventions across writing and running
+- Regular race condition checking with -race flag
+- **Mock files are auto-generated and should not be included in coverage requirements**
+- **Focus coverage analysis on actual business logic implementation files**

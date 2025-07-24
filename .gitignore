@@ -1,0 +1,14 @@
+# OS:-
+.DS_Store
+
+# ignore file name with core, but not core/ folder
+**/core
+!**/core/
+
+# IDEs related files:-
+.idea
+.vscode
+.cursor
+.cursorrules
+.cursorignore
+
