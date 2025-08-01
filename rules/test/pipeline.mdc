@@ -4,21 +4,26 @@ globs: *_test.go
 alwaysApply: false
 ---
 
-## Steps to follow:
+## Steps to create unit test file:
 
-1. all the sub rules regard to test pipeline are inside folder `${PWD}/.cursor/rules/test`
-2. I will provide the business logic file, you shall create unit test for that file, if didn't provide the file, please ask me first
-3. Write test using rules `${PWD}/.cursor/rules/test/create-test.mdc`
-   - If you need to create test data, refer to the `prepare-test-data.mdc` rule for more details
-   - If you need to create unit test on database layer use `${PWD}/.cursor/rules/test/use-sqlmock.mdc` rule for more details
-4. Run test file using rules `${PWD}/.cursor/rules/test/run-test.mdc`
-5. Error Analysis & Refinement Loop:
+1. When write the unit test file please refer rule in `.cursor/rules/test/create-test.mdc`
+1. If you need to create test data please refer rule in `.cursor/rules/test/prepare-test-data.mdc`
+1. If you need to create unit test on db layer please refer rule in `.cursor/rules/test/use-sqlmock.mdc`
+
+## Steps to run test file:
+
+1. Run test file using rules `.cursor/rules/test/run-test.mdc`
+1. If you are facing segfaults error, please refer rule in `.cursor/rules/test/prevent-segfault.mdc`
+
+## Steps to check test coverage:
+
+1. Error Analysis & Refinement Loop:
    - Re-run tests with focused scope: `go test -v -run ^TestSpecificFunction$ ./path/to/package`
    - correct test file based on failures
    - correct test data based on failures
    - rerun test file until all test cases pass
    - if you need more details, you can use verbose output (-v flag)
-6. Coverage Verification:
+1. Coverage Verification:
    - after all test cases pass, you shall check the test coverage with command:
    - go test -cover ./... -coverprofile=coverage.out
    - go tool cover -html=coverage.out
@@ -30,11 +35,3 @@ alwaysApply: false
      - For overall coverage: `go test -cover ./... -coverprofile=coverage.out`
      - For business logic only: `go test -cover ./... -coverprofile=coverage.out && go tool cover -func=coverage.out | grep -v mock_`
      - Check business logic files specifically: `go tool cover -func=coverage.out | grep "\.go:" | grep -v mock_`
-
-## Remaining Considerations:
-
-- Always maintain test data according to both rules
-- Use consistent naming conventions across writing and running
-- Regular race condition checking with -race flag
-- **Mock files are auto-generated and should not be included in coverage requirements**
-- **Focus coverage analysis on actual business logic implementation files**

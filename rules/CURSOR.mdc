@@ -1,0 +1,180 @@
+---
+description: Project structure guidelines for file organization and architecture
+globs:
+alwaysApply: true
+---
+
+# CURSOR.mdc
+
+This file provides guidance to Cursor IDE when working with code in this project.
+
+## General Rules:
+
+1. Act as a AI coding agent, your goal is to solve coding tasks 👽
+1. Always start your output with "Hey DDD buddy here 😘"
+1. Before coding, write a plan and TODO list first 🙋‍♂️
+1. Only when I say "GO!" or explicitly approve, then you can start to write code 💻
+
+## Project Overview
+
+Tyche is a consumer loyalty program system built as a reference repository for Services Engineering (SP Digital). It showcases best practices, integrations, and serves as a template for new projects.
+
+## Key Development Commands
+
+### Setup and Dependencies
+
+```bash
+# First-time setup (creates .netrc, sets up git hooks)
+make init
+
+# Setup all local dependencies (db, kafka, redis, etc.)
+make setup
+
+# Reset database to initial stage
+make db-redo
+
+# Update Go dependencies and vendor
+make tidy
+
+# Tear down all local dependencies
+make teardown
+```
+
+### Local run commands
+
+```bash
+# Run API server locally
+make run-local
+
+# Run tests
+make test
+
+# Generate ORM from database schema
+make gen-orm
+
+# Generate mocks for interfaces
+make gen-mock
+
+# All-in-one preparation (ORM + mocks)
+make boilerplate
+
+# Lint Go code
+make go-lint
+```
+
+## Architecture
+
+This project follows **Clean Architecture** with Go-specific layer naming:
+
+- **api layer** = Controllers (HTTP/Kafka handlers)
+- **app layer** = Use Cases (business flow orchestration)
+- **business layer** = Entities (domain business logic)
+- **repository layer** = Data Access (database/cache)
+
+### Key Directory Structure
+
+```
+api/
+├── cmd/                   # Executable binaries
+│   ├── serverd/           # Main API server
+│   ├── job/               # Batch jobs
+│   ├── consumer/          # Kafka consumers
+│   └── producer/          # Kafka producers
+├── internal/
+│   ├── api/               # Controllers (REST, Kafka handlers)
+│   ├── app/               # Use Cases (orchestration logic)
+│   ├── business/          # Entities (domain business rules)
+│   └── repository/orm/    # Generated SQLBoiler code
+├── system/                # System utilities (Redis, pagination, etc.)
+└── data/migrations/       # Database migrations
+```
+
+## Development Workflow
+
+### Git Hooks (Automatic)
+
+Pre-push hook automatically runs:
+
+- `make api-update-vendor` (if go.mod changed)
+- `make api-gen-orm` (if database schema changed)
+- `make go-lint` + `make test` (if code changed)
+
+### Testing Strategy
+
+- Run `make test` for all unit tests
+- Use `-failfast` and `-timeout 5m` for test execution
+- Tests use Docker Compose with isolated containers
+
+### Code Generation
+
+- **ORM**: Uses SQLBoiler to generate from PostgreSQL schema
+- **Mocks**: Uses Mockery for interface mocking
+- Always regenerate after schema or interface changes
+
+## Technologies Used
+
+- **Backend**: Go 1.23+ with Clean Architecture
+- **Database**: PostgreSQL with SQLBoiler ORM
+- **Cache**: Redis with custom utilities
+- **Messaging**: Kafka for event streaming
+- **Authentication**: OAuth with Auth0
+- **Monitoring**: DataDog integration
+- **Testing**: Go testing with SQL mocks
+
+## Key Dependencies
+
+- **Athena**: SP Digital's internal framework
+- **SQLBoiler**: Database ORM code generation
+- **Chi**: HTTP router
+- **Validator**: Request validation
+- **UUID**: ID generation with Snowflake IDs
+
+## Database
+
+- Uses PostgreSQL as primary database
+- Migrations managed by `golang-migrate/migrate`
+- SQLBoiler generates type-safe ORM code
+- Redis for caching and distributed locking
+
+## Linting and Quality
+
+- Uses `golangci-lint` with custom configuration (`.golangci.toml`)
+- Pre-push hooks enforce code quality
+- Must pass linting before commits are allowed
+
+## Environment Configuration
+
+- `api/local.env`: Local development configuration
+- `api/secret.env`: Local secrets (never commit)
+- Docker Compose handles service dependencies
+
+## Domain-Driven Design
+
+Each business layer domain follows the pattern:
+
+```
+business/domain/{domain}bus/
+├── model.go              # Domain entities
+├── {domain}bus.go        # Business logic
+├── {domain}bus_test.go   # Test file
+├── mock_*.go             # Generated mocks
+└── {domain}db/           # Repository package
+    └── {domain}db.go     # Repository logic
+```
+
+Each application layer domain follows the pattern:
+
+```
+app/domain/{domain}app/
+├── model.go              # Domain entities
+├── {domain}app.go        # Application logic main business orchestrator logic in here
+└── {domain}app_test.go   # Test file
+```
+
+Common domains: walletbus, txnbus, programbus, tierbus, expirybus
+
+## Important Notes
+
+- if you need to work on new domain feature, please refer rule in `./cursor/rules/business/domain-creation.mdc`
+- if you need to work on unit test file like `*_test.go`, please refer rule in `./cursor/rules/test/pipeline.mdc`
+- if I ask you to design new feature, please refer rule in `./cursor/rules/vibe-specs.mdc`

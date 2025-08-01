@@ -1,6 +1,4 @@
 ---
-description: 
-globs: 
 alwaysApply: false
 ---
 # Domain Creation Guidelines
@@ -8,30 +6,36 @@ alwaysApply: false
 ## Implementation Steps
 
 ### File naming convition
+
 - Use clear, descriptive names that reflect the domain's purpose
 - Avoid generic names like "utils" or "common" for domains
 - Use lowercase names with underscores for multi-word domains (e.g., `user_management`)
 
-### File organization
-Create the domain structure in each layer:
-   - REST handlers should go in `api/internal/api/domain/rest/`
-   - Kafka handlers should go in `api/internal/api/domain/kafka/`
-   - app domain business logic goes into `api/internal/app/domain/{domain}app/*.go` (See [App Layer Guidelines](mdc:.cursor/rules/business/general-app.mdc) for details).
-   - domain logics goes into `api/internal/business/domain/{domain}bus/*.go` (See [Business Layer Guidelines](mdc:.cursor/rules/business/general-business.mdc) for details).
-   - if require new constant value goes into `api/internal/constant/*`
-   - orm logic goes into `api/internal/repository/orm/*.go`
+### Newly create file location
 
-### App folder logic
-- Implement use cases in `api/internal/app/domain/{domain}app/*.go` (See [App Layer Guidelines](mdc:.cursor/rules/business/general-app.mdc) for details).
+Create the new domain each layer file location follow below:
+
+1. new REST handlers should go in `api/internal/api/domain/rest/`
+1. new Kafka handlers should go in `api/internal/api/domain/kafka/`
+1. new app layer logic goes into `api/internal/app/domain/{domain}app/*.go`
+1. new domain layer logic goes into `api/internal/business/domain/{domain}bus/*.go`
+1. new orm layer logic goes into `api/internal/repository/orm/*.go`
+1. new constant value goes into `api/internal/constant/*`
+
+### App layer logic
+
+- Implement use cases in `api/internal/app/domain/{domain}app/*.go` (See [App Layer Guidelines](.cursor/rules/business/general-app.mdc) for details).
 - Service interfaces should be defined here
 - Orchestration logic between different domains should be implemented here
 
-### Business folder logic
-- Domain entities should be defined in `api/internal/business/domain/{domain}bus/*.go` (See [Business Layer Guidelines](mdc:.cursor/rules/business/general-business.mdc) for details).
+### Business layer logic
+
+- Domain entities should be defined in `api/internal/business/domain/{domain}bus/*.go` (See [Business Layer Guidelines](.cursor/rules/business/general-business.mdc) for details).
 - Core business rules and validations should be implemented here
 - Define appropriate repository interfaces inside the file
 
-### Storer layer
-- this package mainly to implement the business folder interface which can be found in folder `api/internal/business/domain/{domain}bus/{domain}db/*.go` (See [Business Layer Guidelines](mdc:.cursor/rules/business/general-business.mdc) for details).
+### DB layer logic
+
+- this package mainly to implement the business folder interface which can be found in folder `api/internal/business/domain/{domain}bus/{domain}db/*.go` (See [Business Layer Guidelines](.cursor/rules/business/general-business.mdc) for details).
 - package name follow `{domain}db`
 - file name follow `{domain}db.go`

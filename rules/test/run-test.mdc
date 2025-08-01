@@ -1,23 +1,25 @@
 ---
-description: 
-globs: 
 alwaysApply: false
 ---
+
 # Running Unit Tests Guidelines
 
 ## Basic Test Commands
 
 ### Run All Tests in Current Package
+
 ```bash
 go test ./...
 ```
 
 ### Run Specific Test Function
+
 ```bash
 go test -timeout 30s -run ^TestFunctionName$ code.in.spdigital.sg/sp-digital/tyche/{{package_location}}
 ```
 
 ### Run Tests with Coverage
+
 ```bash
 go test -cover ./...
 ```
@@ -33,6 +35,7 @@ go test -cover ./...
 ## IDE Test Running
 
 In most IDEs (like GoLand, VSCode), you can:
+
 1. Click the "play" button next to test function
 2. Right-click on test file and select "Run Tests"
 3. Use keyboard shortcuts defined by your IDE
@@ -40,6 +43,7 @@ In most IDEs (like GoLand, VSCode), you can:
 ## Test Coverage
 
 To generate and view test coverage:
+
 ```bash
 # Generate coverage profile
 go test -coverprofile=coverage.out ./...
@@ -51,10 +55,12 @@ go tool cover -html=coverage.out
 ## Common Issues & Solutions
 
 1. **Test Cache**
+
    - Go caches test results by default
    - To force re-run: `go clean -testcache` or use `-count=1`
 
 2. **Timeout Issues**
+
    - Default timeout is 10 minutes
    - Adjust with `-timeout` flag (e.g., `-timeout 30s`)
 
@@ -74,6 +80,7 @@ go tool cover -html=coverage.out
 ## Examples
 
 ### Run Single Test
+
 ```bash
 # Run specific test function
 go test -timeout 30s -run ^Test_Debit$ code.in.spdigital.sg/sp-digital/tyche/api/internal/business/domain/expirybus
@@ -83,6 +90,7 @@ go test -v -timeout 30s -run ^Test_Debit$ code.in.spdigital.sg/sp-digital/tyche/
 ```
 
 ### Run Package Tests
+
 ```bash
 # Run all tests in current package
 go test .
@@ -92,6 +100,7 @@ go test ./...
 ```
 
 ### Run with Coverage
+
 ```bash
 # Run tests with coverage for specific package
 go test -cover code.in.spdigital.sg/sp-digital/tyche/api/internal/business/domain/expirybus
