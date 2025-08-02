@@ -8,7 +8,7 @@ alwaysApply: false
 
 1. When write the unit test file please refer rule in `.cursor/rules/test/create-test.mdc`
 1. If you need to create test data please refer rule in `.cursor/rules/test/prepare-test-data.mdc`
-1. If you need to create unit test on db layer please refer rule in `.cursor/rules/test/use-sqlmock.mdc`
+1. If you need to create unit test on {domain}db layer please refer rule in `.cursor/rules/test/use-sqlmock.mdc`
 
 ## Steps to run test file:
 

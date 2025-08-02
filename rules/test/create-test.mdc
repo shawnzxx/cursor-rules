@@ -1,6 +1,3 @@
----
-alwaysApply: false
----
 # Test Creation Base Rules
 
 1.  Use the following libraries for assertions:
@@ -42,5 +39,96 @@ alwaysApply: false
 8.  Use test helpers for common setup or assertion patterns:
     - Create helper functions to reduce duplication in test Code
 
+# Multiple Files Unit Test Rules
 
+## File Naming Convention for Multiple Files
 
+When creating unit tests for multiple related files, follow these naming conventions:
+
+1. **Separate test files for each source file**: Create individual test files following the `{filename}_test.go` pattern
+2. **Do NOT combine multiple source files into a single test file**: Each source file should have its own dedicated test file
+3. **Test file naming examples**:
+   - `enum.go` → `enum_test.go`
+   - `enums_gen_tier_transition_status.go` → `enums_gen_tier_transition_status_test.go`
+   - `enums_gen_tier_transition_action.go` → `enums_gen_tier_transition_action_test.go`
+
+## Test Organization for Different File Types
+
+### Base Enum Files (e.g., `enum.go`)
+
+Test the following in `{filename}_test.go`:
+
+- Enum constants validation
+- Helper methods (e.g., `IsUpgrade()`, `IsDowngrade()`, `IsRetain()`)
+- Validation methods (e.g., `IsValid()`)
+- Basic enum functionality
+
+### Generated Enum Files (e.g., `enums_gen_*.go`)
+
+Test the following in `{filename}_test.go`:
+
+- String conversion methods (`String()`)
+- Value list methods (`Values()`, `Strings()`)
+- String parsing methods (`TierTransitionStatusString()`, `TierTransitionActionString()`)
+- Validation methods (`IsATierTransitionStatus()`, `IsATierTransitionAction()`)
+- Text marshaling (`MarshalText()`, `UnmarshalText()`)
+- JSON marshaling (using `encoding/json`)
+- Edge cases (invalid values, zero values, empty strings)
+- Case-insensitive parsing
+- **Compiler verification functions** (e.g., `_TierTransitionStatusNoOp()`, `_TierTransitionActionNoOp()`)
+  - These functions ensure enum constant values are correct
+  - Test them to verify enum constants have expected values
+  - If constants change, these tests will catch compile-time errors
+
+## Test Coverage Requirements
+
+1. **Comprehensive coverage**: Test all public methods and functions
+2. **Edge cases**: Include tests for invalid inputs, boundary conditions, and error scenarios
+3. **Case sensitivity**: Test both uppercase and lowercase string parsing
+4. **Error handling**: Test error conditions and ensure proper error messages
+5. **JSON compatibility**: Test JSON marshaling/unmarshaling for enums that support it
+
+## Test Structure Guidelines
+
+1. **Use table-driven tests** for methods with multiple input scenarios
+2. **Group related tests** using `t.Run()` for better organization
+3. **Test both positive and negative cases** for validation methods
+4. **Include descriptive test names** that clearly indicate what is being tested
+5. **Test generated code thoroughly** as it may be regenerated and needs to remain functional
+
+## Example Test Structure
+
+```go
+func TestEnumType_String(t *testing.T) {
+    tcs := map[string]struct {
+        input    EnumType
+        expected string
+    }{
+        "valid_value": {
+            input:    EnumTypeValue,
+            expected: "VALUE",
+        },
+        "invalid_value": {
+            input:    EnumType(99),
+            expected: "EnumType(99)",
+        },
+    }
+
+    for name, tc := range tcs {
+        t.Run(name, func(t *testing.T) {
+            result := tc.input.String()
+            assert.Equal(t, tc.expected, result)
+        })
+    }
+}
+```
+
+## Coverage Targets
+
+- **Minimum coverage**: 80% for business logic files
+- **Enum files**: Aim for 100% coverage of all methods
+- **Generated files**: Focus on testing all public interfaces and edge cases
+- **Exclude mock files**: Mock files (`mock_*.go`) should not be included in coverage calculations
+
+8.  Use test helpers for common setup or assertion patterns:
+    - Create helper functions to reduce duplication in test Code

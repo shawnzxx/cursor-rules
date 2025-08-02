@@ -1,22 +1,21 @@
----
-alwaysApply: false
----
 # Go SQLMock Best Practices
 
 ## Overview
 
-This document outlines best practices for using `go-sqlmock` in unit tests, based on practical experience and common patterns.
+This document outlines best practices for using `go-sqlmock`  
+The official documentation is [here](https://github.com/DATA-DOG/go-sqlmock/blob/master/README.md)
 
 ## Key Principles
 
 1. **Mock Setup and Cleanup**
+
    ```go
    func TestDatabase(t *testing.T) {
        t.Parallel()
-       
+
        db, mock, err := sqlmock.New()
        require.NoError(t, err)
-       
+
        // ✅ Correct: Close expectation right before actual close
        defer func() {
            mock.ExpectClose()
@@ -24,23 +23,25 @@ This document outlines best practices for using `go-sqlmock` in unit tests, base
            require.NoError(t, err)
            require.NoError(t, mock.ExpectationsWereMet())
        }()
-       
+
        // ❌ Incorrect: Don't set Close expectation too early
        // mock.ExpectClose()  // Don't do this!
    }
    ```
 
 2. **Expectations Management**
+
    - Set expectations in the exact order they will be executed
    - Keep expectations close to their corresponding operations
    - Use specific argument matchers when possible
+
    ```go
    // ✅ Correct: Query expectation right before the operation
    mock.ExpectQuery(`SELECT (.+) FROM users`).
        WithArgs(1).
        WillReturnRows(rows)
    result := store.GetUser(1)  // Operation immediately follows expectation
-   
+
    // ❌ Incorrect: Don't set all expectations at the start
    // mock.ExpectQuery(...)
    // mock.ExpectExec(...)
@@ -50,28 +51,30 @@ This document outlines best practices for using `go-sqlmock` in unit tests, base
    ```
 
 3. **Transaction Handling**
+
    ```go
    // ✅ Correct: Transaction expectations in order
    mock.ExpectBegin()
    tx, err := db.Begin()
    require.NoError(t, err)
-   
+
    mock.ExpectExec(`UPDATE users`).
        WillReturnResult(sqlmock.NewResult(1, 1))
    err = store.UpdateUser(tx, user)
    require.NoError(t, err)
-   
+
    mock.ExpectCommit()
    err = tx.Commit()
    require.NoError(t, err)
    ```
 
 4. **Result Mocking**
+
    ```go
    // Create mock rows with appropriate columns
    rows := sqlmock.NewRows([]string{"id", "name"}).
        AddRow(1, "test")
-   
+
    // Set expectation right before the query
    mock.ExpectQuery(`SELECT \* FROM users WHERE id = \$1`).
        WithArgs(1).
@@ -79,11 +82,12 @@ This document outlines best practices for using `go-sqlmock` in unit tests, base
    ```
 
 5. **Error Handling**
+
    ```go
    // Test error scenarios
    mock.ExpectQuery(`SELECT \* FROM users`).
        WillReturnError(sql.ErrNoRows)
-   
+
    // Test specific database errors
    mock.ExpectExec(`INSERT INTO users`).
        WillReturnError(&pq.Error{
@@ -92,31 +96,169 @@ This document outlines best practices for using `go-sqlmock` in unit tests, base
        })
    ```
 
+## Flexible SQL Pattern Matching Strategy
+
+### 1. **Recommended Pattern Matching Approach**
+
+Based on successful project patterns, use **flexible and readable** SQL patterns:
+
+```go
+// ✅ Recommended: Flexible and readable patterns
+mock.ExpectQuery("SELECT.*FROM.*tiers").
+    WillReturnRows(rows)
+
+mock.ExpectQuery("SELECT.*FROM.*tiers.*WHERE.*id.*=.*").
+    WithArgs(1).
+    WillReturnRows(rows)
+
+mock.ExpectQuery("INSERT.*INTO.*tiers.*VALUES.*").
+    WithArgs(100, "Silver", sqlmock.AnyArg(), sqlmock.AnyArg()).
+    WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
+
+mock.ExpectExec("UPDATE.*tiers.*SET.*WHERE.*id.*=.*").
+    WithArgs(150, "Updated Silver", sqlmock.AnyArg(), 1).
+    WillReturnResult(sqlmock.NewResult(1, 1))
+```
+
+### 2. **Pattern Matching Benefits**
+
+**Flexible patterns provide**:
+
+- ✅ **Better maintainability**: Less brittle to SQL query changes
+- ✅ **Improved readability**: Clear intent without complex regex
+- ✅ **Easier debugging**: Simpler to understand what's being matched
+- ✅ **Adaptability**: Works with different SQL dialects and ORM changes
+- ✅ **Official alignment**: Matches go-sqlmock official examples
+
+**Key patterns to use**:
+
+```go
+// SELECT queries
+"SELECT.*FROM.*table_name"
+"SELECT.*FROM.*table_name.*WHERE.*column.*=.*"
+
+// INSERT queries
+"INSERT.*INTO.*table_name.*VALUES.*"
+
+// UPDATE queries
+"UPDATE.*table_name.*SET.*WHERE.*id.*=.*"
+
+// DELETE queries
+"DELETE.*FROM.*table_name.*WHERE.*id.*=.*"
+```
+
+### 3. **Column-Specific Matching**
+
+For queries that need to match specific columns:
+
+```go
+// ✅ Match queries containing specific columns
+mock.ExpectQuery("SELECT.*unit_id.*unit_name.*substation_id.*substation_name.*COUNT.*FROM.*vw_asa_jobs").
+    WillReturnRows(rows)
+
+mock.ExpectQuery("SELECT.*status_id.*match_type.*COUNT.*FROM.*vw_asa_jobs").
+    WillReturnRows(rows)
+
+mock.ExpectQuery("SELECT.*status_category.*COUNT.*FROM.*vw_asa_jobs").
+    WillReturnRows(rows)
+```
+
+### 4. **Complex Query Matching**
+
+For complex queries with multiple conditions:
+
+```go
+// ✅ Match complex queries flexibly
+mock.ExpectQuery("SELECT.*FROM.*vw_asa_jobs").
+    WillReturnRows(rows)
+
+// ✅ Match specific table views
+mock.ExpectQuery("SELECT.*COUNT.*FROM.*vw_asa_jobs").
+    WillReturnRows(rows)
+```
+
+## SQLBoiler Integration with Flexible Patterns
+
+### 1. **SQLBoiler Query Patterns**
+
+Even with SQLBoiler, prefer flexible patterns over exact matching:
+
+```go
+// ✅ Recommended: Flexible patterns work with SQLBoiler
+mock.ExpectQuery("SELECT.*FROM.*tiers.*WHERE.*id.*=.*").
+    WithArgs(1).
+    WillReturnRows(rows)
+
+// ✅ For INSERT with RETURNING
+mock.ExpectQuery("INSERT.*INTO.*tiers.*VALUES.*").
+    WithArgs(100, "Silver", sqlmock.AnyArg(), sqlmock.AnyArg()).
+    WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
+
+// ✅ For UPDATE operations
+mock.ExpectExec("UPDATE.*tiers.*SET.*WHERE.*id.*=.*").
+    WithArgs(150, "Updated Silver", sqlmock.AnyArg(), 1).
+    WillReturnResult(sqlmock.NewResult(1, 1))
+```
+
+### 2. **Dynamic Timestamp Handling**
+
+```go
+// ✅ Use AnyArg for dynamic timestamps
+mock.ExpectExec("UPDATE.*tiers.*SET.*WHERE.*id.*=.*").
+    WithArgs(
+        tier.Threshold,
+        tier.Name,
+        sqlmock.AnyArg(), // UpdatedAt is set dynamically
+        tier.ID,
+    ).
+    WillReturnResult(sqlmock.NewResult(1, 1))
+```
+
+### 3. **Parameter Handling**
+
+```go
+// ✅ Use original types, avoid unnecessary conversions
+mock.ExpectQuery("SELECT.*FROM.*tiers.*WHERE.*id.*=.*").
+    WithArgs(tierID). // Use original type
+    WillReturnRows(rows)
+
+// ✅ Handle nullable fields properly
+mock.ExpectQuery("INSERT.*INTO.*tiers.*VALUES.*").
+    WithArgs(
+        tier.Threshold,
+        tier.Name,
+        sqlmock.AnyArg(), // CreatedAt
+        sqlmock.AnyArg(), // UpdatedAt
+    ).
+    WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
+```
+
 ## Common Test Patterns
 
 1. **Basic Query Test**
+
    ```go
    func TestUserQuery(t *testing.T) {
        t.Parallel()
-       
+
        db, mock, err := sqlmock.New()
        require.NoError(t, err)
-       
+
        defer func() {
            mock.ExpectClose()
            err = db.Close()
            require.NoError(t, err)
            require.NoError(t, mock.ExpectationsWereMet())
        }()
-       
+
        store := NewStore(db)
-       
-       // Set up expectations right before operations
-       mock.ExpectQuery(`SELECT \* FROM users WHERE id = \$1`).
+
+       // Use flexible pattern matching
+       mock.ExpectQuery("SELECT.*FROM.*users.*WHERE.*id.*=.*").
            WithArgs(1).
            WillReturnRows(sqlmock.NewRows([]string{"id", "name"}).
                AddRow(1, "test"))
-       
+
        user, err := store.GetUser(1)
        require.NoError(t, err)
        require.Equal(t, "test", user.Name)
@@ -124,89 +266,143 @@ This document outlines best practices for using `go-sqlmock` in unit tests, base
    ```
 
 2. **Transaction Test**
+
    ```go
    func TestUserTransaction(t *testing.T) {
        t.Parallel()
-       
+
        db, mock, err := sqlmock.New()
        require.NoError(t, err)
-       
+
        defer func() {
            mock.ExpectClose()
            err = db.Close()
            require.NoError(t, err)
            require.NoError(t, mock.ExpectationsWereMet())
        }()
-       
+
        store := NewStore(db)
-       
+
        // Transaction expectations in sequence
        mock.ExpectBegin()
-       mock.ExpectExec(`INSERT INTO users`).
+       mock.ExpectQuery("INSERT.*INTO.*users.*VALUES.*").
            WithArgs("test", 25).
-           WillReturnResult(sqlmock.NewResult(1, 1))
+           WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
        mock.ExpectCommit()
-       
+
        err = store.CreateUserTx(context.Background(), User{Name: "test", Age: 25})
        require.NoError(t, err)
+   }
+   ```
+
+3. **Complex Query Test**
+
+   ```go
+   func TestComplexQuery(t *testing.T) {
+       t.Parallel()
+
+       db, mock, err := sqlmock.New()
+       require.NoError(t, err)
+
+       defer func() {
+           mock.ExpectClose()
+           err = db.Close()
+           require.NoError(t, err)
+           require.NoError(t, mock.ExpectationsWereMet())
+       }()
+
+       store := NewStore(db)
+
+       // Mock complex query with multiple columns
+       rows := sqlmock.NewRows([]string{
+           "unit_id", "unit_name", "substation_id", "substation_name", "count",
+       }).AddRow(1, "Unit 1", 10, "Substation 1", 5)
+
+       mock.ExpectQuery("SELECT.*unit_id.*unit_name.*substation_id.*substation_name.*COUNT.*FROM.*vw_asa_jobs").
+           WillReturnRows(rows)
+
+       result, err := store.Visualize(ctx, filter, dimensions)
+       require.NoError(t, err)
+       require.Len(t, result, 1)
    }
    ```
 
 ## Best Practices Checklist
 
 1. **Setup Phase**
+
    - [ ] Initialize mock database with `sqlmock.New()`
    - [ ] Set up defer function for cleanup
    - [ ] Move Close expectation into defer function
 
 2. **Expectations**
+
    - [ ] Set expectations immediately before their operations
-   - [ ] Use precise SQL query patterns
-   - [ ] Include all expected arguments
+   - [ ] Use **flexible SQL patterns** for better maintainability
+   - [ ] Include all expected arguments with correct count
+   - [ ] Use `sqlmock.AnyArg()` for dynamic timestamps
    - [ ] Match data types exactly
 
-3. **Cleanup**
+3. **Pattern Matching Strategy**
+
+   - [ ] Use `"SELECT.*FROM.*table_name"` instead of exact SQL
+   - [ ] Use `"INSERT.*INTO.*table_name.*VALUES.*"` for inserts
+   - [ ] Use `"UPDATE.*table_name.*SET.*WHERE.*id.*=.*"` for updates
+   - [ ] Use `"DELETE.*FROM.*table_name.*WHERE.*id.*=.*"` for deletes
+   - [ ] For complex queries, match key columns: `"SELECT.*column1.*column2.*FROM.*table"`
+
+4. **SQLBoiler Integration**
+
+   - [ ] Flexible patterns work well with SQLBoiler
+   - [ ] Handle dynamic timestamps with `sqlmock.AnyArg()`
+   - [ ] Verify parameter count matches actual query
+   - [ ] Use original data types, avoid unnecessary conversions
+
+5. **Cleanup**
+
    - [ ] Set Close expectation in defer
    - [ ] Close database connection
    - [ ] Check all expectations were met
 
-4. **Common Pitfalls to Avoid**
+6. **Common Pitfalls to Avoid**
    - [ ] Don't set Close expectation too early
    - [ ] Don't set all expectations at the start
    - [ ] Don't forget to check ExpectationsWereMet()
    - [ ] Don't mix expectation and operation order
+   - [ ] Don't use overly complex regex patterns
+   - [ ] Don't try to match exact timestamps
+   - [ ] Don't use exact SQL patterns unless absolutely necessary
 
 ## Error Handling Examples
 
 ```go
 func TestErrorHandling(t *testing.T) {
     t.Parallel()
-    
+
     db, mock, err := sqlmock.New()
     require.NoError(t, err)
-    
+
     defer func() {
         mock.ExpectClose()
         err = db.Close()
         require.NoError(t, err)
         require.NoError(t, mock.ExpectationsWereMet())
     }()
-    
+
     // Test connection error
-    mock.ExpectQuery(`SELECT`).
+    mock.ExpectQuery("SELECT.*FROM.*users.*WHERE.*id.*=.*").
         WillReturnError(sql.ErrConnDone)
-    
+
     // Test constraint violation
-    mock.ExpectExec(`INSERT`).
-        WillReturnError(&pq.Error{
-            Code: "23505",
-        })
+    mock.ExpectQuery("INSERT.*INTO.*users.*VALUES.*").
+        WillReturnError(sql.ErrConnDone) // Use generic error for constraint violation
 }
 ```
 
 ## Concurrent Testing
 
 When writing concurrent tests:
+
 1. Each goroutine should have its own mock expectations
 2. Ensure expectations are set in the correct order within each goroutine
 3. Use sync.WaitGroup to wait for all operations to complete
@@ -215,27 +411,63 @@ When writing concurrent tests:
 ```go
 func TestConcurrent(t *testing.T) {
     t.Parallel()
-    
+
     db, mock, err := sqlmock.New()
     require.NoError(t, err)
-    
+
     defer func() {
         mock.ExpectClose()
         err = db.Close()
         require.NoError(t, err)
         require.NoError(t, mock.ExpectationsWereMet())
     }()
-    
+
     var wg sync.WaitGroup
     for i := 0; i < 3; i++ {
         wg.Add(1)
         go func(id int) {
             defer wg.Done()
-            mock.ExpectQuery(`SELECT`).
+            mock.ExpectQuery("SELECT.*FROM.*users.*WHERE.*id.*=.*").
                 WithArgs(id).
                 WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(id))
         }(i)
     }
     wg.Wait()
 }
+```
+
+## Migration from Exact Patterns
+
+If you have existing tests with exact SQL patterns, consider migrating to flexible patterns:
+
+```go
+// ❌ Old: Exact pattern (brittle)
+mock.ExpectQuery(`SELECT "tiers".\* FROM "tiers" WHERE \("tiers"."id" = \$1\) LIMIT 1`)
+
+// ✅ New: Flexible pattern (maintainable)
+mock.ExpectQuery("SELECT.*FROM.*tiers.*WHERE.*id.*=.*")
+```
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+1. **Pattern too strict**: Use more flexible patterns
+2. **Parameter count mismatch**: Check actual query parameters
+3. **Timestamp issues**: Use `sqlmock.AnyArg()` for dynamic timestamps
+4. **Complex queries**: Match key columns instead of exact SQL
+
+### Debugging Tips
+
+```go
+// Add temporary debug output to see actual SQL
+if boil.IsDebug(ctx) {
+    writer := boil.DebugWriterFrom(ctx)
+    fmt.Fprintln(writer, cache.query)
+    fmt.Fprintln(writer, values)
+}
+```
+
+```
+
 ```
