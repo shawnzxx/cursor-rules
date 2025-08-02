@@ -1,4 +1,4 @@
-# Test Creation Base Rules
+## Base Rules
 
 1.  Use the following libraries for assertions:
 
@@ -39,38 +39,78 @@
 8.  Use test helpers for common setup or assertion patterns:
     - Create helper functions to reduce duplication in test Code
 
-# Multiple Files Unit Test Rules
+## Pre-Creation Analysis Rules
 
-## File Naming Convention for Multiple Files
+**CRITICAL**: Before creating any new test files, always perform the following analysis to avoid duplicate test functions:
 
-When creating unit tests for multiple related files, follow these naming conventions:
+### 1. Existing Test File Analysis
 
-1. **Separate test files for each source file**: Create individual test files following the `{filename}_test.go` pattern
-2. **Do NOT combine multiple source files into a single test file**: Each source file should have its own dedicated test file
-3. **Test file naming examples**:
-   - `enum.go` → `enum_test.go`
-   - `enums_gen_tier_transition_status.go` → `enums_gen_tier_transition_status_test.go`
-   - `enums_gen_tier_transition_action.go` → `enums_gen_tier_transition_action_test.go`
+- **Search for existing test files**: Use `file_search` or `grep_search` to find existing `*_test.go` files in the target package
+- **Analyze existing test coverage**: Read existing test files to understand what functions are already tested
+- **Check for duplicate function names**: Search for existing test function names to avoid conflicts
 
-## Test Organization for Different File Types
+### 2. Decision Matrix
 
-### Base Enum Files (e.g., `enum.go`)
+| Scenario                                   | Action                                                       |
+| ------------------------------------------ | ------------------------------------------------------------ |
+| **No existing test files**                 | Create new test files following naming conventions           |
+| **Existing test file with same name**      | Analyze existing coverage and add missing tests only         |
+| **Existing test file with different name** | Create separate test files for each source file              |
+| **Duplicate function names found**         | Skip creating duplicate functions, focus on missing coverage |
 
-Test the following in `{filename}_test.go`:
+### 3. Best Practices for Multiple Test Files
+
+- **Create separate test files**: Each source file should have its own test file
+- **Do NOT combine multiple source files into a single test file**: Each source file should have its own dedicated test file
+- **Test file naming examples**:
+  - `enum.go` → `enum_test.go`
+  - `enums_gen_tier_transition_status.go` → `enums_gen_tier_transition_status_test.go`
+  - `enums_gen_tier_transition_action.go` → `enums_gen_tier_transition_action_test.go`
+- **Avoid function duplication**: Never create test functions that already exist
+- **Focus on missing coverage**: Only add tests for functions not already covered
+- **Maintain existing structure**: Don't modify existing test files unless necessary
+
+### 4. Example Analysis Process
+
+```go
+// Before creating tests, analyze existing coverage:
+// 1. Check if pointsdb_test.go exists
+// 2. Search for existing test functions:
+//    - TestToBusPointSummaryByMonth ✓ (exists)
+//    - TestToDBPointsSummaryByMonth ✓ (exists)
+//    - TestFilterToQMs ✓ (exists)
+//    - TestModelConversionRoundTrip ✗ (missing)
+//    - TestFilterToQMs_Comprehensive ✗ (missing)
+
+// 3. Create only missing tests:
+func TestModelConversionRoundTrip(t *testing.T) { ... }
+func TestFilterToQMs_Comprehensive(t *testing.T) { ... }
+func TestFilterToQMs_EdgeCases(t *testing.T) { ... }
+```
+
+### 5. Common Pitfalls to Avoid
+
+- ❌ **Don't create duplicate test functions**: Always check existing test files first
+- ❌ **Don't assume no tests exist**: Search thoroughly before creating new tests
+- ❌ **Don't ignore existing coverage**: Build upon existing tests, don't replace them
+- ✅ **Do analyze existing coverage**: Understand what's already tested
+- ✅ **Do create complementary tests**: Add missing coverage with descriptive names
+- ✅ **Do follow naming conventions**: Use clear, descriptive test function names
+- ✅ **Do maintain separation**: Keep test files separate for each source file
+
+## How to test Generated Enum Files
+
+### Base Enum Files (e.g., `enum.go`, `enums_gen_*.go`)
 
 - Enum constants validation
 - Helper methods (e.g., `IsUpgrade()`, `IsDowngrade()`, `IsRetain()`)
 - Validation methods (e.g., `IsValid()`)
 - Basic enum functionality
 
-### Generated Enum Files (e.g., `enums_gen_*.go`)
-
-Test the following in `{filename}_test.go`:
+### rules
 
 - String conversion methods (`String()`)
 - Value list methods (`Values()`, `Strings()`)
-- String parsing methods (`TierTransitionStatusString()`, `TierTransitionActionString()`)
-- Validation methods (`IsATierTransitionStatus()`, `IsATierTransitionAction()`)
 - Text marshaling (`MarshalText()`, `UnmarshalText()`)
 - JSON marshaling (using `encoding/json`)
 - Edge cases (invalid values, zero values, empty strings)
@@ -80,23 +120,7 @@ Test the following in `{filename}_test.go`:
   - Test them to verify enum constants have expected values
   - If constants change, these tests will catch compile-time errors
 
-## Test Coverage Requirements
-
-1. **Comprehensive coverage**: Test all public methods and functions
-2. **Edge cases**: Include tests for invalid inputs, boundary conditions, and error scenarios
-3. **Case sensitivity**: Test both uppercase and lowercase string parsing
-4. **Error handling**: Test error conditions and ensure proper error messages
-5. **JSON compatibility**: Test JSON marshaling/unmarshaling for enums that support it
-
-## Test Structure Guidelines
-
-1. **Use table-driven tests** for methods with multiple input scenarios
-2. **Group related tests** using `t.Run()` for better organization
-3. **Test both positive and negative cases** for validation methods
-4. **Include descriptive test names** that clearly indicate what is being tested
-5. **Test generated code thoroughly** as it may be regenerated and needs to remain functional
-
-## Example Test Structure
+### Example Test Structure
 
 ```go
 func TestEnumType_String(t *testing.T) {
@@ -123,12 +147,218 @@ func TestEnumType_String(t *testing.T) {
 }
 ```
 
-## Coverage Targets
+# domainbus Unit Test Rules
 
-- **Minimum coverage**: 80% for business logic files
-- **Enum files**: Aim for 100% coverage of all methods
-- **Generated files**: Focus on testing all public interfaces and edge cases
-- **Exclude mock files**: Mock files (`mock_*.go`) should not be included in coverage calculations
+## Test Structure
 
-8.  Use test helpers for common setup or assertion patterns:
-    - Create helper functions to reduce duplication in test Code
+When creating unit tests for domain business layer files (`*bus.go`), follow these specific patterns:
+
+### 1. Test File Organization
+
+- **Single test file per bus file**: Create `{domain}bus_test.go` for each `{domain}bus.go`
+- **Test all public methods**: Cover every exported method in the business layer
+- **Mock dependencies**: Use pre-generated mock files (`mock_*.go`) for all interfaces
+
+### 2. Test Case Structure
+
+Use table-driven tests with the following structure:
+
+```go
+func TestBusiness_MethodName(t *testing.T) {
+    tcs := map[string]struct {
+        givenInput     InputType
+        mockSetup      func(*MockStorer, *MockCacher) // if applicable
+        expectedOutput OutputType
+        expectedError  string
+    }{
+        "success": {
+            givenInput: InputType{...},
+            mockSetup: func(mockStorer *MockStorer, mockCacher *MockCacher) {
+                // Set up mock expectations
+                mockStorer.On("MethodName", mock.Anything, mock.Anything).Return(expectedResult, nil)
+            },
+            expectedOutput: OutputType{...},
+            expectedError:  "",
+        },
+        "error_case": {
+            givenInput: InputType{...},
+            mockSetup: func(mockStorer *MockStorer, mockCacher *MockCacher) {
+                mockStorer.On("MethodName", mock.Anything, mock.Anything).Return(OutputType{}, assert.AnError)
+            },
+            expectedOutput: OutputType{},
+            expectedError:  "expected error message",
+        },
+    }
+
+    for name, tc := range tcs {
+        t.Run(name, func(t *testing.T) {
+            // Given
+            mockStorer := &MockStorer{}
+            mockCacher := &MockCacher{} // if applicable
+            tc.mockSetup(mockStorer, mockCacher)
+
+            business := NewBusiness(mockStorer, mockCacher)
+
+            // When
+            actual, err := business.MethodName(context.Background(), tc.givenInput)
+
+            // Then
+            if tc.expectedError != "" {
+                assert.EqualError(t, err, tc.expectedError)
+            } else {
+                assert.NoError(t, err)
+                assert.Equal(t, tc.expectedOutput, actual)
+            }
+
+            mockStorer.AssertExpectations(t)
+            mockCacher.AssertExpectations(t) // if applicable
+        })
+    }
+}
+```
+
+### 3. Required Test Methods
+
+For each `*bus.go` file, test the following methods:
+
+#### Constructor Tests
+
+- `TestBusiness_NewBusiness` - Test constructor function
+- `TestBusiness_NewWithTx` - Test transaction handling
+
+#### Business Logic Tests
+
+- `TestBusiness_MethodName` - Test each public method
+- Include both success and error scenarios
+- Test edge cases and boundary conditions
+
+#### Mock Tests
+
+- `TestMockStorer_MethodName` - Test mock storer methods
+- `TestMockCacher_MethodName` - Test mock cacher methods (if applicable)
+
+### 4. Test Coverage Requirements
+
+#### Success Scenarios
+
+- **Normal operation**: Test with valid inputs
+- **Edge cases**: Test with boundary values
+- **Complex scenarios**: Test with multiple dependencies
+
+#### Error Scenarios
+
+- **Dependency errors**: Test when storer/cacher fails
+- **Validation errors**: Test with invalid inputs
+- **System errors**: Test ID generation failures, time generation failures
+
+#### Special Cases
+
+- **Transaction handling**: Test `NewWithTx` method
+- **ID generation**: Test when SnowflakeID fails
+- **Time handling**: Test when timeutil.Now fails
+- **Cache operations**: Test cache hit/miss scenarios (if applicable)
+
+### 5. Mock Setup Patterns
+
+#### For Simple Methods
+
+```go
+mockStorer.On("MethodName", mock.Anything, mock.Anything).Return(expectedResult, nil)
+```
+
+#### For Complex Validation
+
+```go
+mockStorer.On("MethodName", mock.Anything, mock.MatchedBy(func(input InputType) bool {
+    return input.Field1 == expectedValue &&
+           input.Field2 != 0 &&
+           !input.TimeField.IsZero()
+})).Return(expectedResult, nil)
+```
+
+#### For Error Cases
+
+```go
+mockStorer.On("MethodName", mock.Anything, mock.Anything).Return(OutputType{}, assert.AnError)
+```
+
+### 6. Test Data Patterns
+
+#### Time Handling
+
+```go
+time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+```
+
+#### ID Generation
+
+```go
+// For new records
+summary.ID = 0 // Will be generated by business layer
+
+// For existing records
+summary.ID = 123456789
+```
+
+#### Filter Objects
+
+```go
+QueryFilter{
+    IamIDs:         []string{"user123"},
+    ProgramIDs:     []int64{1},
+    InMonthSGTFrom: func() *time.Time { t := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC); return &t }(),
+    InMonthSGTTo:   func() *time.Time { t := time.Date(2024, 1, 31, 0, 0, 0, 0, time.UTC); return &t }(),
+}
+```
+
+### 7. Error Message Validation
+
+Test error messages match exactly:
+
+```go
+expectedError: "storer.MethodName: assert.AnError general error for testing"
+```
+
+### 8. Test File Structure
+
+```go
+package domainbus
+
+import (
+    "context"
+    "testing"
+    "time"
+
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/mock"
+)
+
+// Constructor tests
+func TestBusiness_NewBusiness(t *testing.T) { ... }
+func TestBusiness_NewWithTx(t *testing.T) { ... }
+
+// Business logic tests
+func TestBusiness_Method1(t *testing.T) { ... }
+func TestBusiness_Method2(t *testing.T) { ... }
+
+// Mock tests
+func TestMockStorer_Method1(t *testing.T) { ... }
+func TestMockStorer_Method2(t *testing.T) { ... }
+```
+
+### 9. Coverage Targets
+
+- **Minimum coverage**: 90% for business logic methods
+- **All public methods**: Must have test coverage
+- **Error paths**: All error scenarios must be tested
+- **Mock methods**: Test all mock interface methods
+
+### 10. Best Practices
+
+- **Use descriptive test names**: Clear indication of what is being tested
+- **Test one scenario per test case**: Keep test cases focused
+- **Verify mock expectations**: Always call `AssertExpectations(t)`
+- **Test both positive and negative cases**: Ensure comprehensive coverage
+- **Use proper time handling**: Use UTC time for consistency
+- **Test ID generation**: Verify SnowflakeID integration
+- **Test transaction support**: Verify `NewWithTx` functionality

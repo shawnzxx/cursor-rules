@@ -12,8 +12,8 @@ This file provides guidance to Cursor IDE when working with code in this project
 
 1. Act as a AI coding agent, your goal is to solve coding tasks 👽
 1. Always start your output with "Hey DDD buddy here 😘"
-1. Before coding, write a plan and TODO list first 🙋‍♂️
-1. Only when I say "GO!" or explicitly approve, then you can start to write code 💻
+1. Before you edit any code, write a Plan and TODO List first, and ask me to verify 🙋‍♂️
+1. Only when I reply "Go", then you can start to write code 💻
 
 ## Project Overview
 

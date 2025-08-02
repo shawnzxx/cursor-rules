@@ -468,6 +468,128 @@ if boil.IsDebug(ctx) {
 }
 ```
 
+## SQLBoiler Upsert Testing
+
+### Key Differences for Upsert Operations
+
+SQLBoiler's upsert operations have specific characteristics that require different testing approaches:
+
+1. **Uses Query, not Exec**: SQLBoiler upserts use `Query` because they include a `RETURNING` clause
+2. **Requires DB Injection**: Must inject mock DB into sqlboiler's global state
+3. **Complex SQL Pattern**: The generated SQL includes `ON CONFLICT` clauses
+
+### SQLBoiler Upsert Test Pattern
+
+```go
+func TestSQLBoilerUpsert(t *testing.T) {
+    t.Parallel()
+
+    db, mock, err := sqlmock.New()
+    require.NoError(t, err)
+
+    defer func() {
+        mock.ExpectClose()
+        err = db.Close()
+        require.NoError(t, err)
+        require.NoError(t, mock.ExpectationsWereMet())
+    }()
+
+    // ✅ CRITICAL: Inject mock DB into sqlboiler
+    oldDB := boil.GetDB()
+    defer func() {
+        boil.SetDB(oldDB)
+    }()
+    boil.SetDB(db)
+
+    // Test data
+    model := &YourModel{
+        ID:   123,
+        Name: "Test",
+        // ... other fields
+    }
+
+    // ✅ Use ExpectQuery (not ExpectExec) for upserts
+    // ✅ Use case-insensitive regex pattern
+    // ✅ Match the RETURNING clause columns
+    rows := sqlmock.NewRows([]string{"id", "name", "created_at"}).
+        AddRow(model.ID, model.Name, model.CreatedAt)
+
+    mock.ExpectQuery("(?i)INSERT INTO.*your_table.*ON CONFLICT.*").
+        WithArgs(
+            model.ID,
+            model.Name,
+            sqlmock.AnyArg(), // CreatedAt
+            sqlmock.AnyArg(), // UpdatedAt
+        ).
+        WillReturnRows(rows)
+
+    // Execute upsert
+    err = model.Upsert(context.Background(), db, true, nil, boil.Infer(), boil.Infer())
+    require.NoError(t, err)
+}
+```
+
+### SQLBoiler Upsert Best Practices
+
+1. **DB Injection Pattern**:
+
+   ```go
+   oldDB := boil.GetDB()
+   defer func() {
+       boil.SetDB(oldDB)
+   }()
+   boil.SetDB(db)
+   ```
+
+2. **Query Pattern Matching**:
+
+   ```go
+   // ✅ Correct: Use ExpectQuery with case-insensitive regex
+   mock.ExpectQuery("(?i)INSERT INTO.*table_name.*ON CONFLICT.*")
+
+   // ❌ Incorrect: Don't use ExpectExec for upserts
+   // mock.ExpectExec("INSERT INTO...")
+   ```
+
+3. **Return Rows Structure**:
+
+   ```go
+   // ✅ Match the RETURNING clause columns exactly
+   rows := sqlmock.NewRows([]string{"id", "name", "created_at"}).
+       AddRow(model.ID, model.Name, model.CreatedAt)
+   ```
+
+4. **Argument Handling**:
+   ```go
+   // ✅ Use AnyArg for dynamic timestamps
+   WithArgs(
+       model.ID,
+       model.Name,
+       sqlmock.AnyArg(), // CreatedAt
+       sqlmock.AnyArg(), // UpdatedAt
+   )
+   ```
+
+### Common SQLBoiler Upsert Issues
+
+1. **Wrong Expectation Type**: Using `ExpectExec` instead of `ExpectQuery`
+2. **Missing DB Injection**: Forgetting to inject mock DB into sqlboiler
+3. **Incorrect Return Columns**: Not matching the `RETURNING` clause columns
+4. **Case-Sensitive Patterns**: Not using `(?i)` flag for case-insensitive matching
+
+### Debugging SQLBoiler Upserts
+
+```go
+// Enable sqlboiler debug to see actual SQL
+ctx := boil.WithDebug(context.Background(), true)
+
+// Check the actual SQL being generated
+if boil.IsDebug(ctx) {
+    writer := boil.DebugWriterFrom(ctx)
+    fmt.Fprintln(writer, "Generated SQL:", cache.query)
+}
+```
+
 ```
 
 ```
