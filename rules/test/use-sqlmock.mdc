@@ -1,595 +1,405 @@
-# Go SQLMock Best Practices
+# 使用 sqlmock 的 AI 专用规则
 
-## Overview
+## 1. 必须遵循的核心要点（务必全部记住）
 
-This document outlines best practices for using `go-sqlmock`  
-The official documentation is [here](https://github.com/DATA-DOG/go-sqlmock/blob/master/README.md)
+- **每个测试用例都要独立初始化 `sqlmock.New()`，并在 defer 里 `db.Close()` + `mock.ExpectationsWereMet()`。**
+- **所有 SQL 匹配必须用“宽松正则”，如 `SELECT.*FROM.*table`，不要用全等或复杂正则。**
+- **每个 SQL 期望（ExpectQuery/ExpectExec）要紧跟实际操作前设置，不能提前批量设置。**
+- **参数匹配要用原始类型，动态时间戳/JSON 等用 `sqlmock.AnyArg()`。**
+- **事务相关要严格按 Begin/Commit/Rollback 顺序设置期望。**
+- **测试用例要覆盖成功和失败（如 DB error）两种分支。**
+- **所有 mock 期望都要被满足，否则测试必须 fail。**
 
-## Key Principles
+## 2. 参考测试样本
 
-1. **Mock Setup and Cleanup**
+- 可以参考测试样本：api/internal/business/domain/pointsbus/pointsdb/pointsdb_test.go
+
+## 3. 推荐测试结构
+
+```go
+func TestXXX(t *testing.T) {
+    t.Parallel()
+
+    db, mock, err := sqlmock.New()
+    require.NoError(t, err)
+    defer func() {
+        mock.ExpectClose()
+        err = db.Close()
+        require.NoError(t, err)
+        require.NoError(t, mock.ExpectationsWereMet())
+    }()
+
+    // 1. 设置 SQL 期望
+    mock.ExpectQuery("SELECT.*FROM.*points").
+        WithArgs(123).
+        WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
+
+    // 2. 调用被测方法
+    result, err := store.Query(ctx, ...)
+
+    // 3. 断言
+    require.NoError(t, err)
+    assert.Equal(t, 1, result.ID)
+}
+```
+
+### 重要：db.Close() 错误处理规则
+
+**必须检查 `db.Close()` 的返回值，避免 linting 错误：**
+
+```go
+// ❌ 错误：没有检查 db.Close() 的返回值
+defer func() {
+    mock.ExpectClose()
+    db.Close() // 这会导致 errcheck linting 错误
+    require.NoError(t, mock.ExpectationsWereMet())
+}()
+
+// ✅ 正确：检查 db.Close() 的返回值
+defer func() {
+    mock.ExpectClose()
+    err = db.Close()
+    require.NoError(t, err)
+    require.NoError(t, mock.ExpectationsWereMet())
+}()
+```
+
+**关键要点：**
+
+- `db.Close()` 可能返回错误，必须检查
+- 使用 `err = db.Close()` 然后 `require.NoError(t, err)`
+- 这样可以避免 `errcheck` linting 错误
+- 同时确保数据库连接正确关闭
+- **对于多个数据库连接（如 db 和 tx），每个都要单独处理**
+
+**多连接示例：**
+
+```go
+// 当测试中有多个数据库连接时
+func TestStore_NewWithTx(t *testing.T) {
+    t.Parallel()
+
+    // Given
+    db, mock, err := sqlmock.New()
+    require.NoError(t, err)
+    defer func() {
+        mock.ExpectClose()
+        err = db.Close()
+        require.NoError(t, err)
+        require.NoError(t, mock.ExpectationsWereMet())
+    }()
+
+    store := New(db)
+    tx, txMock, err := sqlmock.New()
+    require.NoError(t, err)
+    defer func() {
+        txMock.ExpectClose()
+        err = tx.Close()
+        require.NoError(t, err)
+        require.NoError(t, txMock.ExpectationsWereMet())
+    }()
+
+    // When & Then
+    newStore := store.NewWithTx(tx)
+    require.NotNil(t, newStore)
+}
+```
+
+## 4. 常见错误（务必避免）
+
+- 不要用精确 SQL 字符串或复杂正则。
+- 不要提前批量设置所有 SQL 期望。
+- 不要忘记 defer 检查 `ExpectationsWereMet()`。
+- 不要遗漏事务相关的 Begin/Commit/Rollback 期望。
+- 不要用错误类型的参数（如 int64/float64 混用）。
+- **不要忘记检查 `db.Close()` 的返回值，会导致 errcheck linting 错误。**
+- **不要忘记为每个数据库连接（db、tx 等）单独设置 `ExpectClose()` 期望。**
+- **不要忘记检查每个 `Close()` 调用的返回值。**
+
+## 5. 只保留最常用的例子
+
+- 查询：`mock.ExpectQuery("SELECT.*FROM.*table").WithArgs(...).WillReturnRows(...)`
+- 插入：`mock.ExpectQuery("INSERT.*INTO.*table.*VALUES.*").WithArgs(...).WillReturnRows(...)`
+- 更新/删除：`mock.ExpectExec("UPDATE.*table.*SET.*").WithArgs(...).WillReturnResult(...)`
+- 事务：`mock.ExpectBegin()`、`mock.ExpectCommit()`、`mock.ExpectRollback()`
+
+## 5.1. 宽松 SQL 匹配模式（AI 必须遵循）
+
+### 核心原则：使用最宽松的正则表达式匹配
+
+**❌ 错误：过于严格的 SQL 匹配**
+
+```go
+// 过于严格，容易失败
+mock.ExpectQuery("SELECT \"incoming_events\".* FROM \"incoming_events\" WHERE (\"incoming_events\".\"key\" = $1) AND (\"incoming_events\".\"event_id\" = $2) ORDER BY id desc;").
+    WithArgs("test-key", "test-event-id").
+    WillReturnRows(rows)
+```
+
+**✅ 正确：宽松的 SQL 匹配**
+
+```go
+// 宽松匹配，更稳定
+mock.ExpectQuery("SELECT.*FROM.*incoming_events.*WHERE.*key.*=.*AND.*event_id.*=.*ORDER BY.*id.*desc.*").
+    WithArgs("test-key", "test-event-id").
+    WillReturnRows(rows)
+```
+
+### 推荐的 SQL 匹配模式
+
+1. **基础查询模式**
 
    ```go
-   func TestDatabase(t *testing.T) {
-       t.Parallel()
+   // 简单查询
+   mock.ExpectQuery("SELECT.*FROM.*table.*WHERE.*field.*=.*")
 
-       db, mock, err := sqlmock.New()
-       require.NoError(t, err)
+   // 复杂查询（带排序、分页）
+   mock.ExpectQuery("SELECT.*FROM.*table.*WHERE.*field.*=.*ORDER BY.*LIMIT.*OFFSET.*")
+   ```
 
-       // ✅ Correct: Close expectation right before actual close
-       defer func() {
-           mock.ExpectClose()
-           err = db.Close()
-           require.NoError(t, err)
-           require.NoError(t, mock.ExpectationsWereMet())
-       }()
+2. **插入模式**
 
-       // ❌ Incorrect: Don't set Close expectation too early
-       // mock.ExpectClose()  // Don't do this!
+   ```go
+   // INSERT 操作
+   mock.ExpectExec("INSERT.*INTO.*table.*VALUES.*")
+
+   // 或者更宽松的
+   mock.ExpectExec("INSERT.*INTO.*table.*")
+   ```
+
+3. **更新模式**
+
+   ```go
+   // UPDATE 操作
+   mock.ExpectExec("UPDATE.*table.*SET.*WHERE.*id.*=.*")
+   ```
+
+4. **删除模式**
+   ```go
+   // DELETE 操作
+   mock.ExpectExec("DELETE.*FROM.*table.*WHERE.*id.*=.*")
+   ```
+
+### 参数匹配策略
+
+**动态值使用 `sqlmock.AnyArg()`：**
+
+```go
+mock.ExpectExec("INSERT.*INTO.*table.*VALUES.*").
+    WithArgs(
+        sqlmock.AnyArg(), // ID (snowflake)
+        "fixed-value",    // 固定值
+        sqlmock.AnyArg(), // 时间戳
+        sqlmock.AnyArg(), // JSON 数据
+    ).
+    WillReturnResult(sqlmock.NewResult(1, 1))
+```
+
+**固定值使用实际值：**
+
+```go
+mock.ExpectQuery("SELECT.*FROM.*table.*WHERE.*key.*=.*").
+    WithArgs("test-key").  // 固定值
+    WillReturnRows(rows)
+```
+
+## 5.2. 简化断言检查（AI 必须遵循）
+
+### 核心原则：只检查关键字段，避免过度断言
+
+**❌ 错误：过度详细的断言**
+
+```go
+// 过于详细，容易因无关字段变化而失败
+require.Equal(t, int64(123), result[0].ID)
+require.Equal(t, "test-topic", result[0].Topic)
+require.Equal(t, "test-key", result[0].Key)
+require.Equal(t, "test-event-id", result[0].EventID)
+require.Equal(t, "test-consumer-group", result[0].ConsumerGroup)
+require.Equal(t, []byte("test-payload"), result[0].Payload)
+require.Equal(t, map[string]string{"header1": "value1"}, result[0].Headers)
+require.Equal(t, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC), result[0].CreatedAt)
+require.Equal(t, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC), result[0].UpdatedAt)
+```
+
+**✅ 移除了对 Payload 和 Headers 字段的严格检查，只保留了关键字段的验证**
+
+```go
+// 只检查关键业务字段
+require.NoError(t, err)
+require.Len(t, result, 1)
+require.Equal(t, int64(123), result[0].ID)
+require.Equal(t, "test-topic", result[0].Topic)
+require.Equal(t, "test-key", result[0].Key)
+require.Equal(t, "test-event-id", result[0].EventID)
+require.Equal(t, "test-consumer-group", result[0].ConsumerGroup)
+```
+
+### 推荐的断言策略
+
+1. **基础检查**
+
+   ```go
+   require.NoError(t, err)
+   require.Len(t, result, expectedLength)
+   ```
+
+2. **关键字段检查**
+
+   ```go
+   // 只检查核心业务字段
+   require.Equal(t, expectedID, result.ID)
+   require.Equal(t, expectedName, result.Name)
+   require.Equal(t, expectedStatus, result.Status)
+   ```
+
+3. **错误检查**
+
+   ```go
+   require.Error(t, err)
+   require.Contains(t, err.Error(), "expected error message")
+   ```
+
+4. **类型检查**
+   ```go
+   require.NotNil(t, result)
+   require.IsType(t, &ExpectedType{}, result)
+   ```
+
+### 避免检查的字段
+
+- **时间戳字段**：`CreatedAt`, `UpdatedAt`（除非业务逻辑依赖）
+- **复杂数据结构**：`Headers`, `Meta`, `Config`（除非核心业务）
+- **自动生成字段**：`ID`（如果使用 snowflake 等）
+- **内部状态字段**：`Version`, `Status`（除非测试状态转换）
+
+### 参考测试样本
+
+可以参考以下测试文件了解宽松匹配和简化断言的最佳实践：
+
+- `api/internal/business/domain/tierbus/tierdb/tierdb_test.go`
+- `api/internal/business/domain/pointsbus/pointsdb/pointsdb_test.go`
+
+---
+
+## 6. 错误分支覆盖规则（AI 必须遵守）
+
+### 必须测试的错误分支类型：
+
+1. **数据转换错误**
+
+   ```go
+   // 测试 toTxnDB 转换失败
+   input: txnbus.Transaction{
+       Meta: createUnencodableObject(), // 无法 JSON 编码
    }
+   expectedError: "encoder.JSON failed"
    ```
 
-2. **Expectations Management**
-
-   - Set expectations in the exact order they will be executed
-   - Keep expectations close to their corresponding operations
-   - Use specific argument matchers when possible
+2. **参数验证错误**
 
    ```go
-   // ✅ Correct: Query expectation right before the operation
-   mock.ExpectQuery(`SELECT (.+) FROM users`).
-       WithArgs(1).
-       WillReturnRows(rows)
-   result := store.GetUser(1)  // Operation immediately follows expectation
-
-   // ❌ Incorrect: Don't set all expectations at the start
-   // mock.ExpectQuery(...)
-   // mock.ExpectExec(...)
-   // mock.ExpectClose()
-   // ... lots of code ...
-   // actual operations
+   // 测试 order.ToSQLBoilerQMs 参数无效
+   ctx := order.SetInCtx(ctx, order.New(order.By{
+       Name: "invalid_field", // 不在 allowedKeys 中
+   }))
+   expectedError: "By key not allowed"
    ```
 
-3. **Transaction Handling**
+3. **类型转换错误**
 
    ```go
-   // ✅ Correct: Transaction expectations in order
-   mock.ExpectBegin()
-   tx, err := db.Begin()
-   require.NoError(t, err)
-
-   mock.ExpectExec(`UPDATE users`).
-       WillReturnResult(sqlmock.NewResult(1, 1))
-   err = store.UpdateUser(tx, user)
-   require.NoError(t, err)
-
-   mock.ExpectCommit()
-   err = tx.Commit()
-   require.NoError(t, err)
+   // 测试 enum 字符串解析失败
+   mock.ExpectQuery("SELECT.*FROM.*table").
+       WillReturnRows(sqlmock.NewRows([]string{"type"}).AddRow("INVALID_TYPE"))
+   expectedError: "invalid type"
    ```
 
-4. **Result Mocking**
+4. **空值处理错误**
 
    ```go
-   // Create mock rows with appropriate columns
-   rows := sqlmock.NewRows([]string{"id", "name"}).
-       AddRow(1, "test")
-
-   // Set expectation right before the query
-   mock.ExpectQuery(`SELECT \* FROM users WHERE id = \$1`).
-       WithArgs(1).
-       WillReturnRows(rows)
+   // 测试 nil 指针处理
+   input: SomeStruct{
+       RequiredField: nil, // 必填字段为空
+   }
+   expectedError: "required field is nil"
    ```
 
-5. **Error Handling**
+5. **数据库约束违反错误**
 
    ```go
-   // Test error scenarios
-   mock.ExpectQuery(`SELECT \* FROM users`).
-       WillReturnError(sql.ErrNoRows)
+   // 测试唯一约束违反 (UniqueViolation)
+   // 必须使用正确的 PostgreSQL 错误类型
+   import "github.com/jackc/pgx/v5/pgconn"
 
-   // Test specific database errors
-   mock.ExpectExec(`INSERT INTO users`).
-       WillReturnError(&pq.Error{
-           Code:    "23505",
-           Message: "unique_violation",
+   mock.ExpectExec("INSERT INTO.*table.*VALUES.*").
+       WithArgs(...).
+       WillReturnError(&pgconn.PgError{
+           Code:    "23505", // PostgreSQL 唯一约束违反错误码
+           Message: "duplicate key value violates unique constraint",
        })
+
+   // 验证错误处理逻辑
+   require.Error(t, err)
+   require.Contains(t, err.Error(), "duplicate event_id: 456")
    ```
 
-## Flexible SQL Pattern Matching Strategy
-
-### 1. **Recommended Pattern Matching Approach**
-
-Based on successful project patterns, use **flexible and readable** SQL patterns:
-
-```go
-// ✅ Recommended: Flexible and readable patterns
-mock.ExpectQuery("SELECT.*FROM.*tiers").
-    WillReturnRows(rows)
-
-mock.ExpectQuery("SELECT.*FROM.*tiers.*WHERE.*id.*=.*").
-    WithArgs(1).
-    WillReturnRows(rows)
-
-mock.ExpectQuery("INSERT.*INTO.*tiers.*VALUES.*").
-    WithArgs(100, "Silver", sqlmock.AnyArg(), sqlmock.AnyArg()).
-    WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
-
-mock.ExpectExec("UPDATE.*tiers.*SET.*WHERE.*id.*=.*").
-    WithArgs(150, "Updated Silver", sqlmock.AnyArg(), 1).
-    WillReturnResult(sqlmock.NewResult(1, 1))
-```
-
-### 2. **Pattern Matching Benefits**
-
-**Flexible patterns provide**:
-
-- ✅ **Better maintainability**: Less brittle to SQL query changes
-- ✅ **Improved readability**: Clear intent without complex regex
-- ✅ **Easier debugging**: Simpler to understand what's being matched
-- ✅ **Adaptability**: Works with different SQL dialects and ORM changes
-- ✅ **Official alignment**: Matches go-sqlmock official examples
-
-**Key patterns to use**:
-
-```go
-// SELECT queries
-"SELECT.*FROM.*table_name"
-"SELECT.*FROM.*table_name.*WHERE.*column.*=.*"
-
-// INSERT queries
-"INSERT.*INTO.*table_name.*VALUES.*"
-
-// UPDATE queries
-"UPDATE.*table_name.*SET.*WHERE.*id.*=.*"
-
-// DELETE queries
-"DELETE.*FROM.*table_name.*WHERE.*id.*=.*"
-```
-
-### 3. **Column-Specific Matching**
-
-For queries that need to match specific columns:
-
-```go
-// ✅ Match queries containing specific columns
-mock.ExpectQuery("SELECT.*unit_id.*unit_name.*substation_id.*substation_name.*COUNT.*FROM.*vw_asa_jobs").
-    WillReturnRows(rows)
-
-mock.ExpectQuery("SELECT.*status_id.*match_type.*COUNT.*FROM.*vw_asa_jobs").
-    WillReturnRows(rows)
-
-mock.ExpectQuery("SELECT.*status_category.*COUNT.*FROM.*vw_asa_jobs").
-    WillReturnRows(rows)
-```
-
-### 4. **Complex Query Matching**
-
-For complex queries with multiple conditions:
-
-```go
-// ✅ Match complex queries flexibly
-mock.ExpectQuery("SELECT.*FROM.*vw_asa_jobs").
-    WillReturnRows(rows)
-
-// ✅ Match specific table views
-mock.ExpectQuery("SELECT.*COUNT.*FROM.*vw_asa_jobs").
-    WillReturnRows(rows)
-```
-
-## SQLBoiler Integration with Flexible Patterns
-
-### 1. **SQLBoiler Query Patterns**
-
-Even with SQLBoiler, prefer flexible patterns over exact matching:
-
-```go
-// ✅ Recommended: Flexible patterns work with SQLBoiler
-mock.ExpectQuery("SELECT.*FROM.*tiers.*WHERE.*id.*=.*").
-    WithArgs(1).
-    WillReturnRows(rows)
-
-// ✅ For INSERT with RETURNING
-mock.ExpectQuery("INSERT.*INTO.*tiers.*VALUES.*").
-    WithArgs(100, "Silver", sqlmock.AnyArg(), sqlmock.AnyArg()).
-    WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
-
-// ✅ For UPDATE operations
-mock.ExpectExec("UPDATE.*tiers.*SET.*WHERE.*id.*=.*").
-    WithArgs(150, "Updated Silver", sqlmock.AnyArg(), 1).
-    WillReturnResult(sqlmock.NewResult(1, 1))
-```
-
-### 2. **Dynamic Timestamp Handling**
-
-```go
-// ✅ Use AnyArg for dynamic timestamps
-mock.ExpectExec("UPDATE.*tiers.*SET.*WHERE.*id.*=.*").
-    WithArgs(
-        tier.Threshold,
-        tier.Name,
-        sqlmock.AnyArg(), // UpdatedAt is set dynamically
-        tier.ID,
-    ).
-    WillReturnResult(sqlmock.NewResult(1, 1))
-```
-
-### 3. **Parameter Handling**
-
-```go
-// ✅ Use original types, avoid unnecessary conversions
-mock.ExpectQuery("SELECT.*FROM.*tiers.*WHERE.*id.*=.*").
-    WithArgs(tierID). // Use original type
-    WillReturnRows(rows)
-
-// ✅ Handle nullable fields properly
-mock.ExpectQuery("INSERT.*INTO.*tiers.*VALUES.*").
-    WithArgs(
-        tier.Threshold,
-        tier.Name,
-        sqlmock.AnyArg(), // CreatedAt
-        sqlmock.AnyArg(), // UpdatedAt
-    ).
-    WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
-```
-
-## Common Test Patterns
-
-1. **Basic Query Test**
+6. **自定义错误类型检查**
 
    ```go
-   func TestUserQuery(t *testing.T) {
-       t.Parallel()
+   // 测试 dberr.UniqueViolation.Is(err) 逻辑
+   // 错误必须是 *pgconn.PgError 类型才能被正确识别
+   mock.ExpectExec("INSERT INTO.*table.*VALUES.*").
+       WillReturnError(&pgconn.PgError{
+           Code:    "23505",
+           Message: "duplicate key value violates unique constraint",
+       })
 
-       db, mock, err := sqlmock.New()
-       require.NoError(t, err)
-
-       defer func() {
-           mock.ExpectClose()
-           err = db.Close()
-           require.NoError(t, err)
-           require.NoError(t, mock.ExpectationsWereMet())
-       }()
-
-       store := NewStore(db)
-
-       // Use flexible pattern matching
-       mock.ExpectQuery("SELECT.*FROM.*users.*WHERE.*id.*=.*").
-           WithArgs(1).
-           WillReturnRows(sqlmock.NewRows([]string{"id", "name"}).
-               AddRow(1, "test"))
-
-       user, err := store.GetUser(1)
-       require.NoError(t, err)
-       require.Equal(t, "test", user.Name)
-   }
+   // 这会触发 if dberr.UniqueViolation.Is(err) 分支
+   result, err := store.Create(ctx, audit)
+   require.Error(t, err)
+   require.Contains(t, err.Error(), "duplicate event_id: 456")
    ```
 
-2. **Transaction Test**
+### 错误分支测试检查清单：
 
-   ```go
-   func TestUserTransaction(t *testing.T) {
-       t.Parallel()
+- [ ] **每个 `if err != nil` 分支都要有对应的测试用例**
+- [ ] **数据转换函数（如 `toTxnDB`）要有失败测试**
+- [ ] **参数验证函数要有无效参数测试**
+- [ ] **JSON 序列化/反序列化要有错误测试**
+- [ ] **enum 解析要有无效值测试**
+- [ ] **空值处理要有 nil 指针测试**
+- [ ] **数据库操作要有连接错误测试**
+- [ ] **数据库约束违反错误要有正确的错误类型测试**
+- [ ] **自定义错误检查逻辑（如 `dberr.UniqueViolation.Is(err)`）要有对应的错误类型测试**
 
-       db, mock, err := sqlmock.New()
-       require.NoError(t, err)
+---
 
-       defer func() {
-           mock.ExpectClose()
-           err = db.Close()
-           require.NoError(t, err)
-           require.NoError(t, mock.ExpectationsWereMet())
-       }()
+**特别强调：只要严格仿照 ./api/internal/business/domain/pointsbus/pointsdb/pointsdb_test.go 的结构和风格，基本不会出错！**
 
-       store := NewStore(db)
+**额外强调：每个 `if err != nil` 都必须有对应的错误测试用例！**
 
-       // Transaction expectations in sequence
-       mock.ExpectBegin()
-       mock.ExpectQuery("INSERT.*INTO.*users.*VALUES.*").
-           WithArgs("test", 25).
-           WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
-       mock.ExpectCommit()
-
-       err = store.CreateUserTx(context.Background(), User{Name: "test", Age: 25})
-       require.NoError(t, err)
-   }
-   ```
-
-3. **Complex Query Test**
-
-   ```go
-   func TestComplexQuery(t *testing.T) {
-       t.Parallel()
-
-       db, mock, err := sqlmock.New()
-       require.NoError(t, err)
-
-       defer func() {
-           mock.ExpectClose()
-           err = db.Close()
-           require.NoError(t, err)
-           require.NoError(t, mock.ExpectationsWereMet())
-       }()
-
-       store := NewStore(db)
-
-       // Mock complex query with multiple columns
-       rows := sqlmock.NewRows([]string{
-           "unit_id", "unit_name", "substation_id", "substation_name", "count",
-       }).AddRow(1, "Unit 1", 10, "Substation 1", 5)
-
-       mock.ExpectQuery("SELECT.*unit_id.*unit_name.*substation_id.*substation_name.*COUNT.*FROM.*vw_asa_jobs").
-           WillReturnRows(rows)
-
-       result, err := store.Visualize(ctx, filter, dimensions)
-       require.NoError(t, err)
-       require.Len(t, result, 1)
-   }
-   ```
-
-## Best Practices Checklist
-
-1. **Setup Phase**
-
-   - [ ] Initialize mock database with `sqlmock.New()`
-   - [ ] Set up defer function for cleanup
-   - [ ] Move Close expectation into defer function
-
-2. **Expectations**
-
-   - [ ] Set expectations immediately before their operations
-   - [ ] Use **flexible SQL patterns** for better maintainability
-   - [ ] Include all expected arguments with correct count
-   - [ ] Use `sqlmock.AnyArg()` for dynamic timestamps
-   - [ ] Match data types exactly
-
-3. **Pattern Matching Strategy**
-
-   - [ ] Use `"SELECT.*FROM.*table_name"` instead of exact SQL
-   - [ ] Use `"INSERT.*INTO.*table_name.*VALUES.*"` for inserts
-   - [ ] Use `"UPDATE.*table_name.*SET.*WHERE.*id.*=.*"` for updates
-   - [ ] Use `"DELETE.*FROM.*table_name.*WHERE.*id.*=.*"` for deletes
-   - [ ] For complex queries, match key columns: `"SELECT.*column1.*column2.*FROM.*table"`
-
-4. **SQLBoiler Integration**
-
-   - [ ] Flexible patterns work well with SQLBoiler
-   - [ ] Handle dynamic timestamps with `sqlmock.AnyArg()`
-   - [ ] Verify parameter count matches actual query
-   - [ ] Use original data types, avoid unnecessary conversions
-
-5. **Cleanup**
-
-   - [ ] Set Close expectation in defer
-   - [ ] Close database connection
-   - [ ] Check all expectations were met
-
-6. **Common Pitfalls to Avoid**
-   - [ ] Don't set Close expectation too early
-   - [ ] Don't set all expectations at the start
-   - [ ] Don't forget to check ExpectationsWereMet()
-   - [ ] Don't mix expectation and operation order
-   - [ ] Don't use overly complex regex patterns
-   - [ ] Don't try to match exact timestamps
-   - [ ] Don't use exact SQL patterns unless absolutely necessary
-
-## Error Handling Examples
+**重要提醒：测试自定义错误检查逻辑时，必须使用正确的错误类型！**
 
 ```go
-func TestErrorHandling(t *testing.T) {
-    t.Parallel()
+// ❌ 错误：使用字符串错误，dberr.UniqueViolation.Is(err) 会返回 false
+mock.ExpectExec("INSERT INTO.*table.*VALUES.*").
+    WillReturnError(errors.New("23505: duplicate key value violates unique constraint"))
 
-    db, mock, err := sqlmock.New()
-    require.NoError(t, err)
-
-    defer func() {
-        mock.ExpectClose()
-        err = db.Close()
-        require.NoError(t, err)
-        require.NoError(t, mock.ExpectationsWereMet())
-    }()
-
-    // Test connection error
-    mock.ExpectQuery("SELECT.*FROM.*users.*WHERE.*id.*=.*").
-        WillReturnError(sql.ErrConnDone)
-
-    // Test constraint violation
-    mock.ExpectQuery("INSERT.*INTO.*users.*VALUES.*").
-        WillReturnError(sql.ErrConnDone) // Use generic error for constraint violation
-}
+// ✅ 正确：使用 *pgconn.PgError 类型，dberr.UniqueViolation.Is(err) 会返回 true
+mock.ExpectExec("INSERT INTO.*table.*VALUES.*").
+    WillReturnError(&pgconn.PgError{
+        Code:    "23505",
+        Message: "duplicate key value violates unique constraint",
+    })
 ```
 
-## Concurrent Testing
+**关键点：**
 
-When writing concurrent tests:
+- `dberr.UniqueViolation.Is(err)` 检查错误是否为 `*pgconn.PgError` 类型
+- 只有正确的错误类型才能触发 `if dberr.UniqueViolation.Is(err)` 分支
+- 使用错误的错误类型会导致测试覆盖率不完整
 
-1. Each goroutine should have its own mock expectations
-2. Ensure expectations are set in the correct order within each goroutine
-3. Use sync.WaitGroup to wait for all operations to complete
-4. Check ExpectationsWereMet() after all goroutines finish
+## 7. 最后也是最重要的
 
-```go
-func TestConcurrent(t *testing.T) {
-    t.Parallel()
-
-    db, mock, err := sqlmock.New()
-    require.NoError(t, err)
-
-    defer func() {
-        mock.ExpectClose()
-        err = db.Close()
-        require.NoError(t, err)
-        require.NoError(t, mock.ExpectationsWereMet())
-    }()
-
-    var wg sync.WaitGroup
-    for i := 0; i < 3; i++ {
-        wg.Add(1)
-        go func(id int) {
-            defer wg.Done()
-            mock.ExpectQuery("SELECT.*FROM.*users.*WHERE.*id.*=.*").
-                WithArgs(id).
-                WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(id))
-        }(i)
-    }
-    wg.Wait()
-}
-```
-
-## Migration from Exact Patterns
-
-If you have existing tests with exact SQL patterns, consider migrating to flexible patterns:
-
-```go
-// ❌ Old: Exact pattern (brittle)
-mock.ExpectQuery(`SELECT "tiers".\* FROM "tiers" WHERE \("tiers"."id" = \$1\) LIMIT 1`)
-
-// ✅ New: Flexible pattern (maintainable)
-mock.ExpectQuery("SELECT.*FROM.*tiers.*WHERE.*id.*=.*")
-```
-
-## Troubleshooting
-
-### Common Issues and Solutions
-
-1. **Pattern too strict**: Use more flexible patterns
-2. **Parameter count mismatch**: Check actual query parameters
-3. **Timestamp issues**: Use `sqlmock.AnyArg()` for dynamic timestamps
-4. **Complex queries**: Match key columns instead of exact SQL
-
-### Debugging Tips
-
-```go
-// Add temporary debug output to see actual SQL
-if boil.IsDebug(ctx) {
-    writer := boil.DebugWriterFrom(ctx)
-    fmt.Fprintln(writer, cache.query)
-    fmt.Fprintln(writer, values)
-}
-```
-
-## SQLBoiler Upsert Testing
-
-### Key Differences for Upsert Operations
-
-SQLBoiler's upsert operations have specific characteristics that require different testing approaches:
-
-1. **Uses Query, not Exec**: SQLBoiler upserts use `Query` because they include a `RETURNING` clause
-2. **Requires DB Injection**: Must inject mock DB into sqlboiler's global state
-3. **Complex SQL Pattern**: The generated SQL includes `ON CONFLICT` clauses
-
-### SQLBoiler Upsert Test Pattern
-
-```go
-func TestSQLBoilerUpsert(t *testing.T) {
-    t.Parallel()
-
-    db, mock, err := sqlmock.New()
-    require.NoError(t, err)
-
-    defer func() {
-        mock.ExpectClose()
-        err = db.Close()
-        require.NoError(t, err)
-        require.NoError(t, mock.ExpectationsWereMet())
-    }()
-
-    // ✅ CRITICAL: Inject mock DB into sqlboiler
-    oldDB := boil.GetDB()
-    defer func() {
-        boil.SetDB(oldDB)
-    }()
-    boil.SetDB(db)
-
-    // Test data
-    model := &YourModel{
-        ID:   123,
-        Name: "Test",
-        // ... other fields
-    }
-
-    // ✅ Use ExpectQuery (not ExpectExec) for upserts
-    // ✅ Use case-insensitive regex pattern
-    // ✅ Match the RETURNING clause columns
-    rows := sqlmock.NewRows([]string{"id", "name", "created_at"}).
-        AddRow(model.ID, model.Name, model.CreatedAt)
-
-    mock.ExpectQuery("(?i)INSERT INTO.*your_table.*ON CONFLICT.*").
-        WithArgs(
-            model.ID,
-            model.Name,
-            sqlmock.AnyArg(), // CreatedAt
-            sqlmock.AnyArg(), // UpdatedAt
-        ).
-        WillReturnRows(rows)
-
-    // Execute upsert
-    err = model.Upsert(context.Background(), db, true, nil, boil.Infer(), boil.Infer())
-    require.NoError(t, err)
-}
-```
-
-### SQLBoiler Upsert Best Practices
-
-1. **DB Injection Pattern**:
-
-   ```go
-   oldDB := boil.GetDB()
-   defer func() {
-       boil.SetDB(oldDB)
-   }()
-   boil.SetDB(db)
-   ```
-
-2. **Query Pattern Matching**:
-
-   ```go
-   // ✅ Correct: Use ExpectQuery with case-insensitive regex
-   mock.ExpectQuery("(?i)INSERT INTO.*table_name.*ON CONFLICT.*")
-
-   // ❌ Incorrect: Don't use ExpectExec for upserts
-   // mock.ExpectExec("INSERT INTO...")
-   ```
-
-3. **Return Rows Structure**:
-
-   ```go
-   // ✅ Match the RETURNING clause columns exactly
-   rows := sqlmock.NewRows([]string{"id", "name", "created_at"}).
-       AddRow(model.ID, model.Name, model.CreatedAt)
-   ```
-
-4. **Argument Handling**:
-   ```go
-   // ✅ Use AnyArg for dynamic timestamps
-   WithArgs(
-       model.ID,
-       model.Name,
-       sqlmock.AnyArg(), // CreatedAt
-       sqlmock.AnyArg(), // UpdatedAt
-   )
-   ```
-
-### Common SQLBoiler Upsert Issues
-
-1. **Wrong Expectation Type**: Using `ExpectExec` instead of `ExpectQuery`
-2. **Missing DB Injection**: Forgetting to inject mock DB into sqlboiler
-3. **Incorrect Return Columns**: Not matching the `RETURNING` clause columns
-4. **Case-Sensitive Patterns**: Not using `(?i)` flag for case-insensitive matching
-
-### Debugging SQLBoiler Upserts
-
-```go
-// Enable sqlboiler debug to see actual SQL
-ctx := boil.WithDebug(context.Background(), true)
-
-// Check the actual SQL being generated
-if boil.IsDebug(ctx) {
-    writer := boil.DebugWriterFrom(ctx)
-    fmt.Fprintln(writer, "Generated SQL:", cache.query)
-}
-```
-
-```
-
-```
+- 输出的代码和注释一定要用英文

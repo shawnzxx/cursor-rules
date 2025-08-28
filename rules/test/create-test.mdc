@@ -1,364 +1,376 @@
-## Base Rules
+# 单元测试创建指南
 
-1.  Use the following libraries for assertions:
+本文档提供了在 Tyche 项目中创建高质量单元测试的完整指南。
 
-    - "github.com/stretchr/testify/assert"
-    - "github.com/stretchr/testify/require"
+## 基本测试结构
 
-2.  Implement table-driven tests:
+### 1. 测试文件命名
 
-    - Use a variable named `tcs` to hold test cases -`tcs` should be a map[string]struct{}, where the key is the test case name and the struct contains test parameters
-    - each tcs struct key string use English, don't give me Chinese
-    - test case name use English
+- 测试文件必须以 `_test.go` 结尾
+- 与被测试的源文件同目录：`filename.go` -> `filename_test.go`
 
-3.  Group related test cases into Test Suites
-
-    - you shall use function setupSuite(t) and defer teardownSuite(t) for each test which allow them to share same setup
-
-4.  Use appropriate test strategy:
-
-    - Fake, Stub, or Mock objects can be used if you need to handle dependecy
-    - you can use Stub approach only for those function which was defined like aliase function
-    - you can use Mock approach to mimic the dependecy if they are defined like interface, all my interface have pre-generated Mocks library you can refer to the file named with mock\_\*.go in the same folder
-
-5.  Follow Go testing conventions:
-
-    - Name test functions as TestXxx where Xxx describes what's being tested
-    - Use t.Run() for subtests within a test function
-
-6.  Ensure proper error handling and reporting:
-
-    - Use t.Errorf() or t.Fatalf() to report test failures with descriptive messages
-    - Include expected vs. actual values in failure messages
-
-7.  Aim for high test coverage:
-
-    - Test both happy paths and edge cases
-    - Include both positive and negative test cases to ensure cover err handling logic
-
-8.  Use test helpers for common setup or assertion patterns:
-    - Create helper functions to reduce duplication in test Code
-
-## Pre-Creation Analysis Rules
-
-**CRITICAL**: Before creating any new test files, always perform the following analysis to avoid duplicate test functions:
-
-### 1. Existing Test File Analysis
-
-- **Search for existing test files**: Use `file_search` or `grep_search` to find existing `*_test.go` files in the target package
-- **Analyze existing test coverage**: Read existing test files to understand what functions are already tested
-- **Check for duplicate function names**: Search for existing test function names to avoid conflicts
-
-### 2. Decision Matrix
-
-| Scenario                                   | Action                                                       |
-| ------------------------------------------ | ------------------------------------------------------------ |
-| **No existing test files**                 | Create new test files following naming conventions           |
-| **Existing test file with same name**      | Analyze existing coverage and add missing tests only         |
-| **Existing test file with different name** | Create separate test files for each source file              |
-| **Duplicate function names found**         | Skip creating duplicate functions, focus on missing coverage |
-
-### 3. Best Practices for Multiple Test Files
-
-- **Create separate test files**: Each source file should have its own test file
-- **Do NOT combine multiple source files into a single test file**: Each source file should have its own dedicated test file
-- **Test file naming examples**:
-  - `enum.go` → `enum_test.go`
-  - `enums_gen_tier_transition_status.go` → `enums_gen_tier_transition_status_test.go`
-  - `enums_gen_tier_transition_action.go` → `enums_gen_tier_transition_action_test.go`
-- **Avoid function duplication**: Never create test functions that already exist
-- **Focus on missing coverage**: Only add tests for functions not already covered
-- **Maintain existing structure**: Don't modify existing test files unless necessary
-
-### 4. Example Analysis Process
+### 2. 基本测试模板
 
 ```go
-// Before creating tests, analyze existing coverage:
-// 1. Check if pointsdb_test.go exists
-// 2. Search for existing test functions:
-//    - TestToBusPointSummaryByMonth ✓ (exists)
-//    - TestToDBPointsSummaryByMonth ✓ (exists)
-//    - TestFilterToQMs ✓ (exists)
-//    - TestModelConversionRoundTrip ✗ (missing)
-//    - TestFilterToQMs_Comprehensive ✗ (missing)
+package packagename
 
-// 3. Create only missing tests:
-func TestModelConversionRoundTrip(t *testing.T) { ... }
-func TestFilterToQMs_Comprehensive(t *testing.T) { ... }
-func TestFilterToQMs_EdgeCases(t *testing.T) { ... }
-```
+import (
+    "testing"
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
+)
 
-### 5. Common Pitfalls to Avoid
+func TestFunctionName(t *testing.T) {
+    t.Parallel() // 对于不修改全局状态的测试
 
-- ❌ **Don't create duplicate test functions**: Always check existing test files first
-- ❌ **Don't assume no tests exist**: Search thoroughly before creating new tests
-- ❌ **Don't ignore existing coverage**: Build upon existing tests, don't replace them
-- ✅ **Do analyze existing coverage**: Understand what's already tested
-- ✅ **Do create complementary tests**: Add missing coverage with descriptive names
-- ✅ **Do follow naming conventions**: Use clear, descriptive test function names
-- ✅ **Do maintain separation**: Keep test files separate for each source file
-
-## How to test Generated Enum Files
-
-### Base Enum Files (e.g., `enum.go`, `enums_gen_*.go`)
-
-- Enum constants validation
-- Helper methods (e.g., `IsUpgrade()`, `IsDowngrade()`, `IsRetain()`)
-- Validation methods (e.g., `IsValid()`)
-- Basic enum functionality
-
-### rules
-
-- String conversion methods (`String()`)
-- Value list methods (`Values()`, `Strings()`)
-- Text marshaling (`MarshalText()`, `UnmarshalText()`)
-- JSON marshaling (using `encoding/json`)
-- Edge cases (invalid values, zero values, empty strings)
-- Case-insensitive parsing
-- **Compiler verification functions** (e.g., `_TierTransitionStatusNoOp()`, `_TierTransitionActionNoOp()`)
-  - These functions ensure enum constant values are correct
-  - Test them to verify enum constants have expected values
-  - If constants change, these tests will catch compile-time errors
-
-### Example Test Structure
-
-```go
-func TestEnumType_String(t *testing.T) {
-    tcs := map[string]struct {
-        input    EnumType
-        expected string
-    }{
-        "valid_value": {
-            input:    EnumTypeValue,
-            expected: "VALUE",
-        },
-        "invalid_value": {
-            input:    EnumType(99),
-            expected: "EnumType(99)",
-        },
-    }
-
-    for name, tc := range tcs {
-        t.Run(name, func(t *testing.T) {
-            result := tc.input.String()
-            assert.Equal(t, tc.expected, result)
-        })
-    }
-}
-```
-
-# domainbus Unit Test Rules
-
-## Test Structure
-
-When creating unit tests for domain business layer files (`*bus.go`), follow these specific patterns:
-
-### 1. Test File Organization
-
-- **Single test file per bus file**: Create `{domain}bus_test.go` for each `{domain}bus.go`
-- **Test all public methods**: Cover every exported method in the business layer
-- **Mock dependencies**: Use pre-generated mock files (`mock_*.go`) for all interfaces
-
-### 2. Test Case Structure
-
-Use table-driven tests with the following structure:
-
-```go
-func TestBusiness_MethodName(t *testing.T) {
-    tcs := map[string]struct {
-        givenInput     InputType
-        mockSetup      func(*MockStorer, *MockCacher) // if applicable
+    tests := []struct {
+        name           string
+        input          InputType
         expectedOutput OutputType
         expectedError  string
     }{
-        "success": {
-            givenInput: InputType{...},
-            mockSetup: func(mockStorer *MockStorer, mockCacher *MockCacher) {
-                // Set up mock expectations
-                mockStorer.On("MethodName", mock.Anything, mock.Anything).Return(expectedResult, nil)
-            },
-            expectedOutput: OutputType{...},
+        {
+            name:           "success_case",
+            input:          InputType{/* test data */},
+            expectedOutput: OutputType{/* expected result */},
             expectedError:  "",
         },
-        "error_case": {
-            givenInput: InputType{...},
-            mockSetup: func(mockStorer *MockStorer, mockCacher *MockCacher) {
-                mockStorer.On("MethodName", mock.Anything, mock.Anything).Return(OutputType{}, assert.AnError)
-            },
-            expectedOutput: OutputType{},
-            expectedError:  "expected error message",
+        {
+            name:          "error_case",
+            input:         InputType{/* test data */},
+            expectedError: "expected error message",
         },
     }
 
-    for name, tc := range tcs {
-        t.Run(name, func(t *testing.T) {
-            // Given
-            mockStorer := &MockStorer{}
-            mockCacher := &MockCacher{} // if applicable
-            tc.mockSetup(mockStorer, mockCacher)
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            t.Parallel() // 对于不修改全局状态的子测试
 
-            business := NewBusiness(mockStorer, mockCacher)
+            // Given/When/Then 模式
+            // Given: 设置测试数据
 
-            // When
-            actual, err := business.MethodName(context.Background(), tc.givenInput)
+            // When: 执行被测试的函数
+            result, err := FunctionName(tt.input)
 
-            // Then
-            if tc.expectedError != "" {
-                assert.EqualError(t, err, tc.expectedError)
-            } else {
-                assert.NoError(t, err)
-                assert.Equal(t, tc.expectedOutput, actual)
+            // Then: 验证结果
+            if tt.expectedError != "" {
+                assert.EqualError(t, err, tt.expectedError)
+                return
             }
 
-            mockStorer.AssertExpectations(t)
-            mockCacher.AssertExpectations(t) // if applicable
+            assert.NoError(t, err)
+            assert.Equal(t, tt.expectedOutput, result)
         })
     }
 }
 ```
 
-### 3. Required Test Methods
+## 并发测试处理规则 🚨 重要
 
-For each `*bus.go` file, test the following methods:
+### 1. 对于不修改全局状态的测试
 
-#### Constructor Tests
-
-- `TestBusiness_NewBusiness` - Test constructor function
-- `TestBusiness_NewWithTx` - Test transaction handling
-
-#### Business Logic Tests
-
-- `TestBusiness_MethodName` - Test each public method
-- Include both success and error scenarios
-- Test edge cases and boundary conditions
-
-#### Mock Tests
-
-- `TestMockStorer_MethodName` - Test mock storer methods
-- `TestMockCacher_MethodName` - Test mock cacher methods (if applicable)
-
-### 4. Test Coverage Requirements
-
-#### Success Scenarios
-
-- **Normal operation**: Test with valid inputs
-- **Edge cases**: Test with boundary values
-- **Complex scenarios**: Test with multiple dependencies
-
-#### Error Scenarios
-
-- **Dependency errors**: Test when storer/cacher fails
-- **Validation errors**: Test with invalid inputs
-- **System errors**: Test ID generation failures, time generation failures
-
-#### Special Cases
-
-- **Transaction handling**: Test `NewWithTx` method
-- **ID generation**: Test when SnowflakeID fails
-- **Time handling**: Test when timeutil.Now fails
-- **Cache operations**: Test cache hit/miss scenarios (if applicable)
-
-### 5. Mock Setup Patterns
-
-#### For Simple Methods
+**添加 `t.Parallel()` 以提高测试执行速度**
 
 ```go
-mockStorer.On("MethodName", mock.Anything, mock.Anything).Return(expectedResult, nil)
-```
+func TestPureFunction(t *testing.T) {
+    t.Parallel() // ✅ 安全，因为不修改全局状态
 
-#### For Complex Validation
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            t.Parallel() // ✅ 子测试也可以并行
 
-```go
-mockStorer.On("MethodName", mock.Anything, mock.MatchedBy(func(input InputType) bool {
-    return input.Field1 == expectedValue &&
-           input.Field2 != 0 &&
-           !input.TimeField.IsZero()
-})).Return(expectedResult, nil)
-```
-
-#### For Error Cases
-
-```go
-mockStorer.On("MethodName", mock.Anything, mock.Anything).Return(OutputType{}, assert.AnError)
-```
-
-### 6. Test Data Patterns
-
-#### Time Handling
-
-```go
-time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-```
-
-#### ID Generation
-
-```go
-// For new records
-summary.ID = 0 // Will be generated by business layer
-
-// For existing records
-summary.ID = 123456789
-```
-
-#### Filter Objects
-
-```go
-QueryFilter{
-    IamIDs:         []string{"user123"},
-    ProgramIDs:     []int64{1},
-    InMonthSGTFrom: func() *time.Time { t := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC); return &t }(),
-    InMonthSGTTo:   func() *time.Time { t := time.Date(2024, 1, 31, 0, 0, 0, 0, time.UTC); return &t }(),
+            // 测试逻辑...
+        })
+    }
 }
 ```
 
-### 7. Error Message Validation
+### 2. 对于修改全局变量的测试
 
-Test error messages match exactly:
+**不使用 `t.Parallel()` 以避免竞态条件**
 
 ```go
-expectedError: "storer.MethodName: assert.AnError general error for testing"
+var globalVar = "initial"
+
+func TestFunctionModifyingGlobal(t *testing.T) {
+    // ❌ 不使用 t.Parallel() - 修改全局变量会产生竞态条件
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            // ❌ 子测试也不使用 t.Parallel()
+            // 不使用 t.Parallel() 因为修改全局变量会产生竞态条件
+
+            // 保存原始值
+            original := globalVar
+            defer func() {
+                globalVar = original // 恢复原始值
+            }()
+
+            // 修改全局变量进行测试
+            globalVar = tt.testValue
+
+            // 测试逻辑...
+        })
+    }
+}
 ```
 
-### 8. Test File Structure
+### 3. 对于共享资源初始化
+
+**使用 `sync.Once` 确保线程安全的单次初始化**
 
 ```go
-package domainbus
+import "sync"
 
-import (
-    "context"
-    "testing"
-    "time"
-
-    "github.com/stretchr/testify/assert"
-    "github.com/stretchr/testify/mock"
+var (
+    sharedResource *SomeResource
+    once          sync.Once
 )
 
-// Constructor tests
-func TestBusiness_NewBusiness(t *testing.T) { ... }
-func TestBusiness_NewWithTx(t *testing.T) { ... }
+func initializeSharedResource() {
+    once.Do(func() {
+        sharedResource = &SomeResource{
+            // 初始化逻辑
+        }
+    })
+}
 
-// Business logic tests
-func TestBusiness_Method1(t *testing.T) { ... }
-func TestBusiness_Method2(t *testing.T) { ... }
+func TestWithSharedResource(t *testing.T) {
+    t.Parallel() // ✅ 安全，因为使用了 sync.Once 保护
 
-// Mock tests
-func TestMockStorer_Method1(t *testing.T) { ... }
-func TestMockStorer_Method2(t *testing.T) { ... }
+    initializeSharedResource()
+    // 使用 sharedResource 进行测试
+}
 ```
 
-### 9. Coverage Targets
+### 4. 对于环境变量修改
 
-- **Minimum coverage**: 90% for business logic methods
-- **All public methods**: Must have test coverage
-- **Error paths**: All error scenarios must be tested
-- **Mock methods**: Test all mock interface methods
+**不使用 `t.Parallel()` 并添加适当的清理机制**
 
-### 10. Best Practices
+```go
+func TestWithEnvironmentVariable(t *testing.T) {
+    // ❌ 不使用 t.Parallel() - 修改环境变量会产生竞态条件
 
-- **Use descriptive test names**: Clear indication of what is being tested
-- **Test one scenario per test case**: Keep test cases focused
-- **Verify mock expectations**: Always call `AssertExpectations(t)`
-- **Test both positive and negative cases**: Ensure comprehensive coverage
-- **Use proper time handling**: Use UTC time for consistency
-- **Test ID generation**: Verify SnowflakeID integration
-- **Test transaction support**: Verify `NewWithTx` functionality
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            // ❌ 不使用 t.Parallel() 因为修改环境变量会产生竞态条件
+
+            // 保存原始环境变量
+            originalEnv := os.Getenv("TEST_ENV")
+            defer func() {
+                if originalEnv == "" {
+                    os.Unsetenv("TEST_ENV")
+                } else {
+                    os.Setenv("TEST_ENV", originalEnv)
+                }
+            }()
+
+            // 设置测试环境变量
+            err := os.Setenv("TEST_ENV", tt.envValue)
+            require.NoError(t, err)
+
+            // 测试逻辑...
+        })
+    }
+}
+```
+
+## 测试数据准备
+
+### 1. 使用表驱动测试
+
+```go
+tests := []struct {
+    name           string
+    input          InputType
+    mockSetup      func(*MockDependency)
+    expectedOutput OutputType
+    expectedError  string
+}{
+    {
+        name: "success_case",
+        input: InputType{
+            Field1: "value1",
+            Field2: 123,
+        },
+        mockSetup: func(mock *MockDependency) {
+            mock.On("Method", mock.Anything).Return(expectedResult, nil)
+        },
+        expectedOutput: OutputType{
+            Field: "expected",
+        },
+    },
+}
+```
+
+### 2. Mock 设置
+
+```go
+func TestWithMocks(t *testing.T) {
+    t.Parallel()
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            t.Parallel()
+
+            // 创建 mock
+            mockDep := NewMockDependency(t)
+
+            // 设置 mock 期望
+            if tt.mockSetup != nil {
+                tt.mockSetup(mockDep)
+            }
+
+            // 创建被测试对象
+            service := NewService(mockDep)
+
+            // 执行测试
+            result, err := service.Method(tt.input)
+
+            // 验证结果
+            if tt.expectedError != "" {
+                assert.EqualError(t, err, tt.expectedError)
+                return
+            }
+
+            assert.NoError(t, err)
+            assert.Equal(t, tt.expectedOutput, result)
+
+            // 验证 mock 调用
+            mockDep.AssertExpectations(t)
+        })
+    }
+}
+```
+
+## 错误处理测试
+
+### 1. 确保每个 'if err != nil' 分支都有对应的测试用例
+
+```go
+// 被测试的函数
+func ProcessData(input string) (string, error) {
+    if input == "" {
+        return "", errors.New("input cannot be empty") // ← 需要测试用例
+    }
+
+    result, err := externalCall(input)
+    if err != nil {
+        return "", fmt.Errorf("external call failed: %w", err) // ← 需要测试用例
+    }
+
+    return result, nil
+}
+
+// 测试用例必须覆盖所有错误分支
+tests := []struct {
+    name          string
+    input         string
+    mockSetup     func()
+    expectedError string
+}{
+    {
+        name:          "empty_input_error",
+        input:         "",
+        expectedError: "input cannot be empty",
+    },
+    {
+        name:  "external_call_error",
+        input: "valid_input",
+        mockSetup: func() {
+            // 设置 mock 返回错误
+        },
+        expectedError: "external call failed: mock error",
+    },
+    {
+        name:  "success_case",
+        input: "valid_input",
+        mockSetup: func() {
+            // 设置 mock 返回成功
+        },
+    },
+}
+```
+
+## 测试覆盖率要求
+
+### 1. 最低覆盖率要求
+
+- **业务逻辑文件至少 80% 覆盖率**
+- **排除 mock\_\*.go 文件** - 这些是自动生成的 mock 文件
+
+### 2. 覆盖率检查命令
+
+```bash
+# 整体覆盖率
+go test -cover ./... -coverprofile=coverage.out
+
+# 仅业务逻辑覆盖率（排除 mock 文件）
+go test -cover ./... -coverprofile=coverage.out && go tool cover -func=coverage.out | grep -v mock_
+
+# 检查特定业务逻辑文件
+go tool cover -func=coverage.out | grep "\.go:" | grep -v mock_
+
+# 生成 HTML 覆盖率报告
+go tool cover -html=coverage.out
+```
+
+## 项目特定规则
+
+### 1. 使用宽松的 SQL 匹配模式
+
+对于 SQL 测试，使用宽松的正则表达式而不是严格匹配：
+
+```go
+// ✅ 推荐：宽松模式
+mock.ExpectQuery("SELECT.*FROM.*table").WillReturnRows(rows)
+
+// ❌ 避免：过于严格的匹配
+mock.ExpectQuery("SELECT id, name FROM table WHERE id = ?").WillReturnRows(rows)
+```
+
+### 2. 遵循 Given/When/Then 模式
+
+```go
+t.Run("test_case", func(t *testing.T) {
+    t.Parallel()
+
+    // Given: 准备测试数据和 mock
+    input := TestInput{Field: "value"}
+    mockDep := NewMockDependency(t)
+    mockDep.On("Method", mock.Anything).Return(expected, nil)
+
+    // When: 执行被测试的函数
+    result, err := functionUnderTest(input, mockDep)
+
+    // Then: 验证结果
+    require.NoError(t, err)
+    assert.Equal(t, expected, result)
+    mockDep.AssertExpectations(t)
+})
+```
+
+### 3. 测试文件组织
+
+- 每个源文件对应一个测试文件
+- 测试函数名称应该清晰描述被测试的功能
+- 使用描述性的测试用例名称
+
+## 常见陷阱和最佳实践
+
+### ❌ 避免的做法
+
+- 在修改全局变量的测试中使用 `t.Parallel()`
+- 在修改环境变量的测试中使用 `t.Parallel()`
+- 忽略错误分支的测试覆盖
+- 使用过于严格的 SQL 匹配模式
+- 忘记清理测试后的状态
+
+### ✅ 推荐的做法
+
+- 对纯函数使用 `t.Parallel()` 提高测试速度
+- 使用 `sync.Once` 保护共享资源初始化
+- 为每个错误分支编写测试用例
+- 使用表驱动测试提高可维护性
+- 在测试后恢复全局状态
+- 使用 Given/When/Then 模式组织测试逻辑
