@@ -1,6 +1,11 @@
+---
+globs: *_test.go
+alwaysApply: false
+---
+
 # 单元测试创建指南
 
-本文档提供了在 Tyche 项目中创建高质量单元测试的完整指南。
+本文档提供了在 ${PROJECT_NAME} 项目中创建高质量单元测试的完整指南。
 
 ## 基本测试结构
 
@@ -21,7 +26,7 @@ import (
 )
 
 func TestFunctionName(t *testing.T) {
-    t.Parallel() // 对于不修改全局状态的测试
+    t.Parallel() // 使用 t.Parallel() 如果测试不修改全局状态
 
     tests := []struct {
         name           string
@@ -44,7 +49,7 @@ func TestFunctionName(t *testing.T) {
 
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
-            t.Parallel() // 对于不修改全局状态的子测试
+            t.Parallel() // 使用 t.Parallel() 如果子测试不修改全局状态
 
             // Given/When/Then 模式
             // Given: 设置测试数据
@@ -65,7 +70,86 @@ func TestFunctionName(t *testing.T) {
 }
 ```
 
-## 并发测试处理规则 🚨 重要
+## 断言选择指南 🎯
+
+### 基本原则
+
+- **新测试**：默认使用 `assert.*` 系列
+- **现有测试**：保持现有的 `require.*` 调用不变（避免不必要的修改）
+- **错误检查**：对于独立的错误检查，优先使用 `assert.NoError(t, err)` 或 `assert.EqualError(t, err, "expected message")`
+- **CI/CD 环境**：`assert.*` 和 `require.*` 都会在测试失败时停止 CI/CD，但 `assert.*` 提供更多诊断信息
+
+在绝大多数情况下，特别是在 **CI/CD 环境**中，推荐使用 `assert.*` 系列断言：
+
+```go
+func TestWallet(t *testing.T) {
+    wallet := CreateWallet()
+
+    // ✅ 推荐：使用 assert - 收集所有失败信息
+    assert.NotNil(t, wallet)
+    assert.Equal(t, 100, wallet.Balance)
+    assert.Equal(t, "active", wallet.Status)
+    assert.True(t, wallet.IsValid())
+    // 即使前面的断言失败，所有断言都会执行，提供完整的错误信息
+}
+```
+
+**为什么推荐 `assert`：**
+
+- 📊 **更好的错误诊断**：收集所有失败，一次看到所有问题
+- 🚀 **提高调试效率**：一次性修复所有错误，而不是一个一个来
+- ⚡ **CI/CD 行为一致**：任何失败都会导致 `make test` 返回非零退出码，停止 CI/CD pipeline
+- 🔍 **完整的测试报告**：在 Jenkins 日志中能看到所有失败的断言
+
+#### 仅在依赖场景使用 `require.*`
+
+只在**后续断言强烈依赖前面结果**时使用 `require.*`：
+
+```go
+func TestWalletOperations(t *testing.T) {
+    wallet := CreateWallet()
+
+    // ✅ 合适使用 require：如果 wallet 为 nil，后续操作都没意义
+    require.NotNil(t, wallet)
+
+    // 这些断言相互独立，使用 assert
+    assert.Equal(t, 100, wallet.Balance)
+    assert.Equal(t, "active", wallet.Status)
+    assert.True(t, wallet.IsValid())
+
+    // 另一个依赖场景
+    err := wallet.Debit(50)
+    require.NoError(t, err) // 如果这里失败，后续余额检查没意义
+
+    assert.Equal(t, 50, wallet.Balance)
+}
+```
+
+#### 对比示例
+
+```go
+// ❌ 使用 require - 只看到第一个问题
+func TestWalletWithRequire(t *testing.T) {
+    wallet := CreateWallet()
+    require.NotNil(t, wallet)        // 如果失败，测试停止
+    require.Equal(t, 100, wallet.Balance)    // 不会执行
+    require.Equal(t, "active", wallet.Status) // 不会执行
+    require.True(t, wallet.IsValid())        // 不会执行
+    // 结果：只知道第一个错误，需要多次修复-测试循环
+}
+
+// ✅ 使用 assert - 看到所有问题
+func TestWalletWithAssert(t *testing.T) {
+    wallet := CreateWallet()
+    assert.NotNil(t, wallet)         // 失败但继续
+    assert.Equal(t, 100, wallet.Balance)     // 也会检查
+    assert.Equal(t, "active", wallet.Status) // 也会检查
+    assert.True(t, wallet.IsValid())         // 也会检查
+    // 结果：一次看到所有错误，一次性修复所有问题
+}
+```
+
+## 测试用例规范
 
 ### 1. 对于不修改全局状态的测试
 
@@ -356,6 +440,110 @@ t.Run("test_case", func(t *testing.T) {
 - 测试函数名称应该清晰描述被测试的功能
 - 使用描述性的测试用例名称
 
+### Interface Nil 处理方式
+
+#### 问题：Go Interface 的 nil 陷阱
+
+当将 `nil` 具体类型指针传递给接口参数时，接口不会是 `nil`。这会导致 `interface == nil` 检查失败。
+
+#### 错误示例
+
+```go
+func TestWithNilInterface_Wrong(t *testing.T) {
+    var mockCacher *MockCacher = nil  // nil 具体类型
+
+    // ❌ 错误：传递 nil 具体类型给接口参数
+    business := NewBusiness(storer, mockCacher)
+
+    // 这会失败，因为 business.cacher != nil
+    // (接口包含 nil *MockCacher，不是 nil 接口)
+    result, err := business.RefreshCache(ctx)
+}
+```
+
+#### ✅ 正确处理方法
+
+```go
+func TestWithNilInterface_Correct(t *testing.T) {
+    var mockCacher *MockCacher = nil
+
+    // ✅ 正确：显式创建 nil 接口
+    var cacherInterface Cacher  // nil 接口
+    if mockCacher != nil {
+        cacherInterface = mockCacher
+    }
+
+    business := NewBusiness(storer, cacherInterface)
+
+    // 现在 business.cacher == nil 检查会正确工作
+    result, err := business.RefreshCache(ctx)
+}
+```
+
+#### 实际案例：RefreshCache 测试修复
+
+```go
+// 修复前的错误测试
+for name, tc := range tcs {
+    t.Run(name, func(t *testing.T) {
+        mockStorer := &MockStorer{}
+        var mockCacher *MockCacher
+
+        if name == "no_cacher_configured" {
+            mockCacher = nil  // ❌ 这是 nil 具体类型，不是 nil 接口
+        } else {
+            mockCacher = &MockCacher{}
+        }
+
+        // ❌ 错误：传递可能是 nil 具体类型的值给接口参数
+        business := NewBusiness(mockStorer, mockCacher)
+    })
+}
+
+// 修复后的正确测试
+for name, tc := range tcs {
+    t.Run(name, func(t *testing.T) {
+        mockStorer := &MockStorer{}
+        var mockCacher *MockCacher
+
+        if name == "no_cacher_configured" {
+            mockCacher = nil
+        } else {
+            mockCacher = &MockCacher{}
+        }
+
+        tc.mockSetup(mockStorer, mockCacher)
+
+        // ✅ 正确：显式处理 nil 接口
+        var cacherInterface Cacher
+        if mockCacher != nil {
+            cacherInterface = mockCacher
+        }
+        // 如果 mockCacher 是 nil，cacherInterface 保持 nil 接口
+
+        business := NewBusiness(mockStorer, cacherInterface)
+    })
+}
+```
+
+#### 关键原理
+
+在 Go 中，接口只有在**类型和值都为 nil** 时才为 `nil`：
+
+```go
+var i interface{} = (*MyType)(nil)  // 接口不为 nil！
+fmt.Println(i == nil)               // false
+
+var i interface{} = nil             // 接口为 nil
+fmt.Println(i == nil)               // true
+```
+
+### 最佳实践
+
+1. **明确区分 nil 具体类型和 nil 接口**
+2. **测试中需要 nil 接口时，显式处理转换**
+3. **避免直接将可能为 nil 的具体类型变量传递给接口参数**
+
 ## 常见陷阱和最佳实践
 
 ### ❌ 避免的做法
@@ -365,6 +553,7 @@ t.Run("test_case", func(t *testing.T) {
 - 忽略错误分支的测试覆盖
 - 使用过于严格的 SQL 匹配模式
 - 忘记清理测试后的状态
+- **直接将 nil 具体类型传递给接口参数**
 
 ### ✅ 推荐的做法
 
@@ -374,3 +563,4 @@ t.Run("test_case", func(t *testing.T) {
 - 使用表驱动测试提高可维护性
 - 在测试后恢复全局状态
 - 使用 Given/When/Then 模式组织测试逻辑
+- **正确处理接口的 nil 值转换**

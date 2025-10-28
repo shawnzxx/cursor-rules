@@ -15,7 +15,7 @@ go test ./...
 ### Run Specific Test Function
 
 ```bash
-go test -timeout 30s -run ^TestFunctionName$ code.in.spdigital.sg/sp-digital/tyche/{{package_location}}
+go test -timeout 30s -run ^TestFunctionName$ code.in.spdigital.sg/sp-digital/${PROJECT_NAME}/{{package_location}}
 ```
 
 ### Run Tests with Coverage
@@ -83,10 +83,10 @@ go tool cover -html=coverage.out
 
 ```bash
 # Run specific test function
-go test -timeout 30s -run ^Test_Debit$ code.in.spdigital.sg/sp-digital/tyche/api/internal/business/domain/expirybus
+go test -timeout 30s -run ^Test_Debit$ code.in.spdigital.sg/sp-digital/${PROJECT_NAME}/api/internal/business/domain/expirybus
 
 # Run with verbose output
-go test -v -timeout 30s -run ^Test_Debit$ code.in.spdigital.sg/sp-digital/tyche/api/internal/business/domain/expirybus
+go test -v -timeout 30s -run ^Test_Debit$ code.in.spdigital.sg/sp-digital/${PROJECT_NAME}/api/internal/business/domain/expirybus
 ```
 
 ### Run Package Tests
@@ -103,7 +103,7 @@ go test ./...
 
 ```bash
 # Run tests with coverage for specific package
-go test -cover code.in.spdigital.sg/sp-digital/tyche/api/internal/business/domain/expirybus
+go test -cover code.in.spdigital.sg/sp-digital/${PROJECT_NAME}/api/internal/business/domain/expirybus
 
 # Run all tests with coverage and generate report
 go test -coverprofile=coverage.out ./... && go tool cover -html=coverage.out

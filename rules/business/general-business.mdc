@@ -1,7 +1,8 @@
 ---
-globs: *_test.go
+globs: *.go
 alwaysApply: false
 ---
+
 # Business Layer (Entities) Guidelines
 
 This rule applies to files within the Business Layer (`[api/internal/business/](mdc:api/internal/business)`), which corresponds to **Entities** in Clean Architecture.

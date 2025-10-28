@@ -17,7 +17,7 @@ This file provides guidance to Cursor IDE when working with code in this project
 
 ## Project Overview
 
-Tyche is a consumer loyalty program system built as a reference repository for Services Engineering (SP Digital). It showcases best practices, integrations, and serves as a template for new projects.
+${PROJECT_NAME} can find from ./Makefile, it is the project name that will be used to name the docker container and other resources.
 
 ## Key Development Commands
 

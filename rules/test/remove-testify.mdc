@@ -1,0 +1,71 @@
+---
+alwaysApply: false
+---
+
+### 1. replace testify with be library
+
+use cmp context7 get the latest info of how to use github.com/nalgeon/be
+
+```
+# 1. modify import package
+# remove:
+# "github.com/stretchr/testify/assert"
+# "github.com/stretchr/testify/require"
+# add:
+# "github.com/nalgeon/be"
+```
+
+### 2. Key Conversions consider applied
+
+```
+✅ require.NoError(t, err) → be.Err(t, err, nil)
+✅ assert.Equal(t, expected, actual) → be.Equal(t, actual, expected) (parameter order reversed!)
+✅ assert.Error(t, err) → be.True(t, err != nil)
+✅ assert.True/False(t, x) → be.True(t, x) / be.True(t, !x)
+✅ require.IsType(t, qm.OrderBy(""), x) → Type assertions with be.True(t, ok)
+✅ Test names: "successful initialization" → "successful_initialization"
+```
+
+### 3. modify test case name format
+
+```
+# change all test case name from space separated to underscore separated
+# for example:
+# "successful initialization" → "successful_initialization"
+# "double initialization fails" → "double_initialization_fails"
+# "get notification before initialization fails" → "get_notification_before_initialization_fails"
+```
+
+### 4. refactor setupSuite function
+
+```
+#if there are subtests, add common setup and teardown steps in the main function body
+```
+
+### 5. keep test structure
+
+```
+# keep the following structure unchanged:
+# - t.Parallel() can be used in main test body or subtests
+# - table driven test structure
+# - error handling logic
+# - expected behavior of test cases
+```
+
+### 6. verify your changes and troubleshooting
+
+```
+# run tests to ensure there are no errors for the test file you have modified
+go test -v ./path/to/test/file
+# if you need to load loca.env, it inside "./api/local.env"
+
+# sometimes if you can not connect to database or redis dependecy, becasue my docker container may be off
+#you can resolve it by running:
+make teardown
+make setup
+
+# check have any linter error
+make lint
+# fix linter error
+make fix-lint
+```

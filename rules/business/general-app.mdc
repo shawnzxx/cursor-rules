@@ -1,7 +1,8 @@
 ---
-globs: *_test.go
+globs: *.go
 alwaysApply: false
 ---
+
 # App Layer (Use Cases) Guidelines
 
 This rule applies to files within the App Layer (`[api/internal/app/](mdc:api/internal/app)`), which corresponds to **Use Cases** in Clean Architecture.

@@ -13,11 +13,11 @@ signal: segmentation fault
 === RUN `make test` command from project root folder
 ...
 signal: segmentation fault
-FAIL    code.in.spdigital.sg/sp-digital/tyche/api/internal/app/domain/adminapp  0.005s
+FAIL    code.in.spdigital.sg/sp-digital/${PROJECT_NAME}/api/internal/app/domain/adminapp  0.005s
 FAIL
 make: *** [api-test] Error 1
 make test failed. Aborting push.
-error: failed to push some refs to 'https://code.in.spdigital.sg/sp-digital/tyche.git'
+error: failed to push some refs to 'https://code.in.spdigital.sg/sp-digital/${PROJECT_NAME}.git'
 ```
 
 ## Common Causes of Mocking and Verify Errors
