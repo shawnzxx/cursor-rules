@@ -36,20 +36,14 @@ use cmp context7 get the latest info of how to use github.com/nalgeon/be
 # "get notification before initialization fails" → "get_notification_before_initialization_fails"
 ```
 
-### 4. refactor setupSuite function
+### 4. test best practices
 
 ```
-#if there are subtests, add common setup and teardown steps in the main function body
-```
-
-### 5. keep test structure
-
-```
-# keep the following structure unchanged:
-# - t.Parallel() can be used in main test body or subtests
-# - table driven test structure
+# - t.Parallel() can be used in each test suite or subtest
+# - use table driven test structure
 # - error handling logic
 # - expected behavior of test cases
+# - if you need you can write a common concerns setup and teardown function into the MainTest and TestSuite level
 ```
 
 ### 6. verify your changes and troubleshooting

@@ -1,5 +1,4 @@
 ---
-globs: *.go
 alwaysApply: false
 ---
 

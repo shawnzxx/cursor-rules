@@ -1,0 +1,144 @@
+---
+alwaysApply: false
+---
+
+# API Layer Unit Test Guidelines
+
+## Scope
+
+- Target files are HTTP/Kafka handlers (REST API, routing layer) located under `api/internal/api/`.
+- Focus on verifying handler behavior, not business logic or data access layer.
+
+## Core Principles
+
+1. **Dependency Injection**
+
+   - Abstract application layer dependencies as interfaces (e.g., `programApp`, `walletApp`).
+   - Use hand-written stub structs in tests, implementing only the required methods.
+   - Provide a factory function (e.g., `newAPIWithStubs`) to inject stubs, ensuring handler isolation from tests.
+
+2. **Table-Driven & Parallel Sub-Tests**
+
+   - Use a consistent `testCases := []struct { ... }` pattern with recommended fields:
+     `name`, `method`, `path`, `reqBody`, `prepareRequest`, `stubFactory`, `wantStatusCode`, `wantRespBody`.
+   - Use `t.Run(tc.name, func(t *testing.T) { t.Parallel() ... })` to ensure independent test cases run in parallel.
+   - **Note**: Go 1.22+ no longer requires variable copying like `tc := tc`; use loop variables directly in closures.
+   - Use underscore-style naming for test names (e.g., `wallet_app_error`).
+
+3. **Request Preparation & Context**
+
+   - Use helper functions to set authentication info, route params, or cursor:
+     - `withUserProfile(req, iamID)` injects user context.
+     - `withRouteParam(req, key, value)` writes chi path parameters.
+     - `pagecursor.SetInCtx` assigns pagination context.
+   - **Use pure JSON strings for request bodies and responses**:
+     - Construct request bodies with `strings.NewReader`.
+     - Prefer inline JSON strings (e.g., `reqBody: "{\"url\":\"https://example.com\"}"`) over helper functions.
+     - This makes test cases more intuitive with expectations visible at a glance.
+
+4. **Response Assertions**
+
+   - Use `github.com/nalgeon/be` throughout, replacing `assert` / `require`:
+     - `be.Equal(t, actual, expected)`
+     - `be.Err(t, err, nil)`, etc.
+   - Use custom `assertResponse` to uniformly verify HTTP status codes and bodies, with `strings.TrimSpace` to remove whitespace.
+   - **Use pure JSON strings for expected responses**:
+     - Use JSON strings directly in `wantRespBody`, avoiding helper functions.
+     - Example: `wantRespBody: "{\"error\":\"internal\",\"error_description\":\"Something went wrong\"}"`
+     - Ensure JSON field names match actual API responses (e.g., `points_balance` not `point_balance`).
+     - Include all response fields, including optional/nullable fields (e.g., `points_expiring: null`).
+
+5. **Cover Critical Paths**
+
+   - At minimum, include: success path, authentication failure, parameter validation failure, dependency errors, etc.
+   - For pagination/cursor logic, verify filter conditions, returned lists, and `next_cursor` fields.
+   - **Edge Cases to Cover**:
+     - ParseInt overflow errors (e.g., `"99999999999999999999"` exceeds int64 max)
+     - Negative values for IDs and cursors
+     - Invalid format strings for numeric parameters
+     - Empty result sets from dependencies
+     - Missing required route parameters
+     - Authentication context not set (unauthenticated requests)
+   - **Cursor Validation**: When testing cursor-based pagination, verify:
+     - Valid cursor values are properly parsed and passed to dependencies
+     - Invalid cursor formats trigger appropriate error responses
+     - Negative cursor values are rejected
+     - Cursor assertions check the actual cursor field, not unrelated filter fields
+
+6. **Route Registration Tests**
+
+   - When the package exposes `Route...` helpers (e.g. `RouteB2C`, `RouteM2M`), add dedicated tests that create a fresh chi router, invoke the route helper, and use `chi.Walk` to assert:
+     - Every expected route path is registered.
+     - Each route exposes the intended HTTP methods.
+     - Critical middlewares (auth, timeout, pagination, ordering, etc.) are attached.
+   - These tests must fail if a business logic change renames a path, removes a method, or drops a middleware.
+
+7. **Completion Steps**
+   - Run `gofmt` after modifications.
+   - Execute `go test ./api/internal/api/domain/<target>` to verify tests pass.
+   - Ensure `read_lints` shows no additional warnings.
+
+## Recommended Helper Functions
+
+- `newAPIWithStubs(stubs *apiStubs) *api`: Centrally creates handlers with default stub implementations returning zero values, overridden as needed.
+- `apiStubs` struct contains all handler dependencies, facilitating scenario-based injection in `stubFactory`.
+- Helper functions like `assertResponse`, `withUserProfile`, `withRouteParam` can be reused.
+- **Avoid using `mustJSON` and `errorJSON` helper functions**: Direct JSON strings are clearer.
+
+## Stub Implementation Best Practices
+
+- Nil check logic for stub methods:
+  ```go
+  func (s *stubApp) Method(...) (..., error) {
+      if s.methodFunc != nil {  // Correct: call when function exists
+          return s.methodFunc(...)
+      }
+      return ..., errs.Newf(errs.Internal, "method not implemented")
+  }
+  ```
+- **Common mistake**: `if s.methodFunc == nil` causes nil pointer exceptions; must use `!= nil`.
+
+## Test Coverage Verification
+
+When adding tests for uncovered functions:
+
+1. **Identify Coverage Gaps**: Use coverage tools or manual inspection to find untested code paths
+2. **Read Implementation**: Carefully read the handler implementation to understand all code paths
+3. **Map Error Paths**: Identify all error conditions (ParseInt failures, nil checks, validation errors, dependency errors)
+4. **Create Targeted Tests**: Write test cases that specifically exercise each uncovered line
+5. **Verify Coverage**: Run tests and confirm all lines are covered
+
+**Common Code Paths to Test**:
+
+- Success path with valid inputs
+- Authentication missing or invalid
+- Route parameter parsing errors (invalid format, overflow, negative values)
+- Missing required parameters
+- Dependency method errors (app layer, repository layer)
+- Empty result sets from dependencies
+- Cursor/pagination validation errors
+
+**Example Test Coverage Pattern**:
+
+```go
+func TestAPI_handlerName(t *testing.T) {
+    testCases := []struct {
+        name           string
+        prepareRequest func(*http.Request) *http.Request
+        stubFactory    func(*testing.T) *apiStubs
+        wantStatusCode int
+        wantRespBody   string
+    }{
+        {name: "success", ...},                    // Happy path
+        {name: "unauthenticated", ...},            // Missing auth context
+        {name: "invalid_param_format", ...},       // ParseInt/validation error
+        {name: "param_overflow", ...},             // Numeric overflow
+        {name: "negative_param", ...},             // Negative value validation
+        {name: "dependency_error", ...},           // App layer error
+        {name: "empty_result", ...},               // Empty data set
+    }
+    // Run all test cases...
+}
+```
+
+Following these guidelines enables rapid construction of stable, maintainable, and extensible API layer unit tests.

@@ -113,7 +113,7 @@ Pre-push hook automatically runs:
 
 ## Technologies Used
 
-- **Backend**: Go 1.23+ with Clean Architecture
+- **Backend**: Go 1.25+ with Clean Architecture
 - **Database**: PostgreSQL with SQLBoiler ORM
 - **Cache**: Redis with custom utilities
 - **Messaging**: Kafka for event streaming
