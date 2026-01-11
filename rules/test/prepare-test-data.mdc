@@ -1,4 +1,6 @@
 ---
+description: Guidelines for organizing and managing test data files and fixtures
+globs: *_test.go
 alwaysApply: false
 ---
 

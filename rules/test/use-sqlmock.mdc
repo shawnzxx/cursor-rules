@@ -1,3 +1,9 @@
+---
+description: Comprehensive guidelines for using sqlmock in database layer unit tests with loose SQL matching and error branch coverage
+globs: *_test.go
+alwaysApply: false
+---
+
 # 使用 sqlmock 的 AI 专用规则
 
 ## 1. 必须遵循的核心要点（务必全部记住）
@@ -12,7 +18,10 @@
 
 ## 2. 参考测试样本
 
-- 可以参考测试样本：api/internal/business/domain/pointsbus/pointsdb/pointsdb_test.go
+参考以下测试文件了解最佳实践：
+
+- @api/internal/business/domain/pointsbus/pointsdb/pointsdb_test.go
+- @api/internal/business/domain/tierbus/tierdb/tierdb_test.go
 
 ## 3. 推荐测试结构
 
@@ -277,8 +286,8 @@ require.Equal(t, "test-consumer-group", result[0].ConsumerGroup)
 
 可以参考以下测试文件了解宽松匹配和简化断言的最佳实践：
 
-- `api/internal/business/domain/tierbus/tierdb/tierdb_test.go`
-- `api/internal/business/domain/pointsbus/pointsdb/pointsdb_test.go`
+- @api/internal/business/domain/tierbus/tierdb/tierdb_test.go
+- @api/internal/business/domain/pointsbus/pointsdb/pointsdb_test.go
 
 ---
 
@@ -375,7 +384,7 @@ require.Equal(t, "test-consumer-group", result[0].ConsumerGroup)
 
 ---
 
-**特别强调：只要严格仿照 ./api/internal/business/domain/pointsbus/pointsdb/pointsdb_test.go 的结构和风格，基本不会出错！**
+**特别强调：只要严格仿照 @api/internal/business/domain/pointsbus/pointsdb/pointsdb_test.go 的结构和风格，基本不会出错！**
 
 **额外强调：每个 `if err != nil` 都必须有对应的错误测试用例！**
 

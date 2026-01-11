@@ -1,4 +1,5 @@
 ---
+description: Comprehensive guidelines for creating unit tests using github.com/nalgeon/be library
 globs: *_test.go
 alwaysApply: false
 ---
@@ -256,6 +257,16 @@ go tool cover -html=coverage.out
 ```
 
 ## project specific rules
+
+### Reference Examples
+
+For business layer tests, see:
+- @api/internal/business/domain/tierbus/tierbus_test.go
+- @api/internal/business/domain/walletbus/walletbus_test.go
+
+For app layer tests, see:
+- @api/internal/app/domain/tierapp/tierapp_test.go
+- @api/internal/app/domain/walletapp/model_test.go
 
 ### if you are doing DB layer unit test, becareful of below rules
 

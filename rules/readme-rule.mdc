@@ -1,4 +1,6 @@
 ---
+description: Guidelines for writing and maintaining README.md and other documentation files
+globs: README.md
 alwaysApply: false
 ---
 

@@ -1,4 +1,5 @@
 ---
+description: Guidelines for creating new domains following Clean Architecture and DDD principles
 alwaysApply: false
 ---
 # Domain Creation Guidelines
@@ -27,12 +28,14 @@ Create the new domain each layer file location follow below:
 - Implement use cases in `api/internal/app/domain/{domain}app/*.go` (See [App Layer Guidelines](.cursor/rules/business/general-app.mdc) for details).
 - Service interfaces should be defined here
 - Orchestration logic between different domains should be implemented here
+- Example: @api/internal/app/domain/walletapp/walletapp.go
 
 ### Business layer logic
 
 - Domain entities should be defined in `api/internal/business/domain/{domain}bus/*.go` (See [Business Layer Guidelines](.cursor/rules/business/general-business.mdc) for details).
 - Core business rules and validations should be implemented here
 - Define appropriate repository interfaces inside the file
+- Example: @api/internal/business/domain/walletbus/walletbus.go
 
 ### DB layer logic
 

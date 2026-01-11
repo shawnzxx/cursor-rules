@@ -1,4 +1,5 @@
 ---
+description: Guidelines for running Go tests with various flags and coverage analysis
 alwaysApply: false
 ---
 

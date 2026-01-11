@@ -1,4 +1,6 @@
 ---
+description: Guidelines for writing API layer unit tests with stub functions and HTTP handler testing
+globs: api/internal/api/**/*_test.go
 alwaysApply: false
 ---
 
@@ -84,6 +86,13 @@ alwaysApply: false
 - `apiStubs` struct contains all handler dependencies, facilitating scenario-based injection in `stubFactory`.
 - Helper functions like `assertResponse`, `withUserProfile`, `withRouteParam` can be reused.
 - **Avoid using `mustJSON` and `errorJSON` helper functions**: Direct JSON strings are clearer.
+
+## Reference Examples
+
+For API layer test examples, see:
+- @api/internal/api/domain/rest/b2capi/b2capi_test.go
+- @api/internal/api/domain/rest/adminapi/adminapi_test.go
+- @api/internal/api/domain/rest/adminapi/api_tier_test.go
 
 ## Stub Implementation Best Practices
 

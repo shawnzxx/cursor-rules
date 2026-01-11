@@ -1,4 +1,6 @@
 ---
+description: Guidelines for migrating from testify to github.com/nalgeon/be library in test files
+globs: *_test.go
 alwaysApply: false
 ---
 

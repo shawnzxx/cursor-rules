@@ -1,3 +1,9 @@
+---
+description: Guidelines for debugging and preventing segmentation faults in Go tests
+globs: *_test.go
+alwaysApply: false
+---
+
 # Go Test Prevent Segfaults Guide
 
 ## Overview
@@ -313,8 +319,3 @@ The key to prevention is:
 - **Use -race flag regularly**
 - **Keep tests isolated and independent**
 - **Avoid global variables in tests**
-  description:
-  globs:
-  alwaysApply: false
-
----

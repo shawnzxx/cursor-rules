@@ -1,4 +1,5 @@
 ---
+description: Workflow for creating specs before implementation (Spec → Code approach)
 alwaysApply: false
 ---
 ## Development Workflow: Spec → Code

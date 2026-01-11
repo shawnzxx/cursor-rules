@@ -1,21 +1,21 @@
 ---
-description: Guidelines on how to start test development pipeline
+description: Guidelines on how to start test development pipeline - references other test rules
 globs: *_test.go
 alwaysApply: false
 ---
 
-## Steps to create unit test file:
+## Steps to create unit test file
 
 1. When write the unit test file please refer rule in `.cursor/rules/test/create-test.mdc`
 1. If you need to create test data please refer rule in `.cursor/rules/test/prepare-test-data.mdc`
 1. If you need to create unit test on {domain}db layer please refer rule in `.cursor/rules/test/use-sqlmock.mdc`
 
-## Steps to run test file:
+## Steps to run test file
 
 1. Run test file using rules `.cursor/rules/test/run-test.mdc`
 1. If you are facing segfaults error, please refer rule in `.cursor/rules/test/prevent-segfault.mdc`
 
-## Steps to check test coverage:
+## Steps to check test coverage
 
 1. Error Analysis & Refinement Loop:
    - Re-run tests with focused scope: `go test -v -run ^TestSpecificFunction$ ./path/to/package`
